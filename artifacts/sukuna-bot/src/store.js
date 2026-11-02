@@ -1,24 +1,16 @@
+
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 const SNOWFLAKE_PATTERN = /^\d{17,20}$/;
 const MARRIAGE_PROPOSAL_STATUSES = new Set([
-  "pending",
-  "accepted",
-  "declined",
-  "expired",
-  "cancelled",
+  "pending", "accepted", "declined", "expired", "cancelled",
 ]);
 const ANIME_REPLY_STATUSES = new Set(["pending", "used", "expired", "cancelled"]);
 const DIVORCE_CONFIRMATION_STATUSES = new Set([
-  "pending",
-  "confirmed",
-  "cancelled",
-  "expired",
-  "superseded",
-  "stale",
+  "pending", "confirmed", "cancelled", "expired", "superseded", "stale",
 ]);
 
 function isRecord(value) {
@@ -39,6 +31,17 @@ function makeDefaultConfig() {
     currentCount: 0,
     highestCount: 0,
     lastCounterId: null,
+
+    autoModEnabled: false,
+    autoModMessageLimit: 6,
+    autoModDuplicateLimit: 3,
+    autoModMentionLimit: 6,
+    autoModAction: "warn",
+    autoModTimeoutMs: 60000,
+
+    raidProtectionEnabled: false,
+    raidJoinLimit: 8,
+    raidJoinWindowMs: 10000,
   };
 }
 
@@ -68,6 +71,49 @@ function normalizeConfig(raw) {
       ? Math.max(raw.highestCount, config.currentCount)
       : config.currentCount;
   config.lastCounterId = isSnowflake(raw.lastCounterId) ? raw.lastCounterId : null;
+
+  config.autoModEnabled = raw.autoModEnabled === true;
+  config.autoModMessageLimit =
+    Number.isInteger(raw.autoModMessageLimit) &&
+    raw.autoModMessageLimit >= 3 &&
+    raw.autoModMessageLimit <= 30
+      ? raw.autoModMessageLimit
+      : 6;
+  config.autoModDuplicateLimit =
+    Number.isInteger(raw.autoModDuplicateLimit) &&
+    raw.autoModDuplicateLimit >= 2 &&
+    raw.autoModDuplicateLimit <= 10
+      ? raw.autoModDuplicateLimit
+      : 3;
+  config.autoModMentionLimit =
+    Number.isInteger(raw.autoModMentionLimit) &&
+    raw.autoModMentionLimit >= 3 &&
+    raw.autoModMentionLimit <= 30
+      ? raw.autoModMentionLimit
+      : 6;
+  config.autoModAction = ["warn", "timeout"].includes(raw.autoModAction)
+    ? raw.autoModAction
+    : "warn";
+  config.autoModTimeoutMs =
+    Number.isInteger(raw.autoModTimeoutMs) &&
+    raw.autoModTimeoutMs >= 10000 &&
+    raw.autoModTimeoutMs <= 600000
+      ? raw.autoModTimeoutMs
+      : 60000;
+
+  config.raidProtectionEnabled = raw.raidProtectionEnabled === true;
+  config.raidJoinLimit =
+    Number.isInteger(raw.raidJoinLimit) &&
+    raw.raidJoinLimit >= 3 &&
+    raw.raidJoinLimit <= 30
+      ? raw.raidJoinLimit
+      : 8;
+  config.raidJoinWindowMs =
+    Number.isInteger(raw.raidJoinWindowMs) &&
+    raw.raidJoinWindowMs >= 5000 &&
+    raw.raidJoinWindowMs <= 60000
+      ? raw.raidJoinWindowMs
+      : 10000;
 
   return config;
 }
@@ -139,6 +185,7 @@ function normalizeMarriageProposals(raw) {
   const ids = new Set();
   const pendingMembers = new Set();
   const now = Date.now();
+
   for (const entry of raw) {
     if (
       !isRecord(entry) ||
@@ -197,6 +244,7 @@ function normalizeAnimeReplies(raw) {
   const replies = [];
   const ids = new Set();
   const now = Date.now();
+
   for (const entry of raw) {
     if (
       !isRecord(entry) ||
@@ -220,6 +268,7 @@ function normalizeAnimeReplies(raw) {
     if (status === "pending" && Date.parse(entry.expiresAt) <= now) {
       status = "expired";
     }
+
     ids.add(entry.id);
     replies.push({
       id: entry.id,
@@ -248,12 +297,14 @@ function normalizeInteractionCounts(raw) {
   for (const [guildId, byGuild] of Object.entries(raw)) {
     if (!isSnowflake(guildId) || !isRecord(byGuild)) continue;
     const guildCounts = {};
+
     for (const [pairKey, byPair] of Object.entries(byGuild)) {
       if (!isRecord(byPair)) continue;
       const [actorId, targetId] = pairKey.split(":");
       if (!actorId || !targetId || !isSnowflake(actorId) || !isSnowflake(targetId)) {
         continue;
       }
+
       const pairCounts = {};
       for (const [action, value] of Object.entries(byPair)) {
         if (
@@ -266,10 +317,12 @@ function normalizeInteractionCounts(raw) {
           pairCounts[action] = Math.floor(value);
         }
       }
+
       if (Object.keys(pairCounts).length > 0) {
         guildCounts[pairKey] = pairCounts;
       }
     }
+
     if (Object.keys(guildCounts).length > 0) {
       counts[guildId] = guildCounts;
     }
@@ -284,6 +337,7 @@ function normalizeDivorceConfirmations(raw) {
   const confirmations = [];
   const ids = new Set();
   const now = Date.now();
+
   for (const entry of raw) {
     if (
       !isRecord(entry) ||
@@ -306,6 +360,7 @@ function normalizeDivorceConfirmations(raw) {
     if (status === "pending" && Date.parse(entry.expiresAt) <= now) {
       status = "expired";
     }
+
     ids.add(entry.id);
     confirmations.push({
       id: entry.id,
@@ -324,7 +379,7 @@ function normalizeDivorceConfirmations(raw) {
 }
 
 export function normalizeStoreData(raw) {
-  if (!isRecord(raw) || ![1, DATA_VERSION].includes(raw.version)) {
+  if (!isRecord(raw) || ![1, 2, DATA_VERSION].includes(raw.version)) {
     throw new Error("The Sukuna data file has an unsupported or invalid format.");
   }
 
@@ -349,10 +404,6 @@ export function normalizeStoreData(raw) {
 
 function copyRecord(record) {
   return record ? { ...record } : null;
-}
-
-function marriageKey(guildId, userId) {
-  return `${guildId}:${userId}`;
 }
 
 function makeMarriage(guildId, firstId, secondId, marriedAt) {
@@ -435,22 +486,81 @@ export class JsonStore {
       "autoRoleId",
       "selfAssignableRoleIds",
       "countingChannelId",
+      "autoModEnabled",
+      "autoModMessageLimit",
+      "autoModDuplicateLimit",
+      "autoModMentionLimit",
+      "autoModAction",
+      "autoModTimeoutMs",
+      "raidProtectionEnabled",
+      "raidJoinLimit",
+      "raidJoinWindowMs",
     ]);
+
     const config = this.getGuildConfig(guildId);
 
     for (const [field, value] of Object.entries(patch)) {
-      if (!allowedFields.has(field)) throw new Error("Unknown server setting.");
+      if (!allowedFields.has(field)) {
+        throw new Error("Unknown server setting.");
+      }
+
       if (field === "selfAssignableRoleIds") {
         if (!Array.isArray(value) || !value.every(isSnowflake)) {
           throw new Error("Invalid self-assignable role list.");
         }
         config[field] = [...new Set(value)];
-      } else {
+        continue;
+      }
+
+      if (
+        field === "welcomeChannelId" ||
+        field === "modLogChannelId" ||
+        field === "autoRoleId" ||
+        field === "countingChannelId"
+      ) {
         if (value !== null && !isSnowflake(value)) {
           throw new Error(`Invalid value for ${field}.`);
         }
         config[field] = value;
+        continue;
       }
+
+      if (field === "autoModAction") {
+        if (!["warn", "timeout"].includes(value)) {
+          throw new Error("Invalid automatic moderation action.");
+        }
+        config[field] = value;
+        continue;
+      }
+
+      if (field === "autoModEnabled" || field === "raidProtectionEnabled") {
+        if (typeof value !== "boolean") {
+          throw new Error(`Invalid value for ${field}.`);
+        }
+        config[field] = value;
+        continue;
+      }
+
+      const limits = {
+        autoModMessageLimit: [3, 30],
+        autoModDuplicateLimit: [2, 10],
+        autoModMentionLimit: [3, 30],
+        autoModTimeoutMs: [10000, 600000],
+        raidJoinLimit: [3, 30],
+        raidJoinWindowMs: [5000, 60000],
+      };
+
+      const range = limits[field];
+      if (
+        !range ||
+        !Number.isInteger(value) ||
+        value < range[0] ||
+        value > range[1]
+      ) {
+        throw new Error(`Invalid value for ${field}.`);
+      }
+
+      config[field] = value;
     }
 
     await this.save();
@@ -477,6 +587,7 @@ export class JsonStore {
       highestCount: config.highestCount,
       lastCounterId: config.lastCounterId,
     };
+
     config.currentCount = count;
     config.highestCount = Math.max(config.highestCount, count);
     config.lastCounterId = userId;
@@ -507,6 +618,7 @@ export class JsonStore {
       moderatorId,
       createdAt: new Date().toISOString(),
     };
+
     this.data.warnings[key] ??= [];
     this.data.warnings[key].push(entry);
     await this.save();
@@ -527,6 +639,7 @@ export class JsonStore {
         entry.guildId === guildId &&
         (entry.memberA === userId || entry.memberB === userId),
     );
+
     if (!marriage) return null;
     return {
       ...marriage,
@@ -551,6 +664,7 @@ export class JsonStore {
 
   async expireMarriageProposals(guildId = null, now = Date.now()) {
     let changed = false;
+
     for (const proposal of this.data.marriageProposals) {
       if (
         proposal.status === "pending" &&
@@ -568,6 +682,7 @@ export class JsonStore {
 
   async getPendingMarriageProposals(guildId, userId, now = Date.now()) {
     await this.expireMarriageProposals(guildId, now);
+
     return this.data.marriageProposals
       .filter(
         (entry) =>
@@ -597,6 +712,7 @@ export class JsonStore {
     }
 
     await this.expireMarriageProposals(guildId, now);
+
     if (this.getMarriage(guildId, proposerId) || this.getMarriage(guildId, recipientId)) {
       return { ok: false, reason: "already-married" };
     }
@@ -610,6 +726,7 @@ export class JsonStore {
           [proposerId, recipientId].includes(id),
         ),
     );
+
     if (conflict) return { ok: false, reason: "pending-conflict" };
 
     const proposal = {
@@ -623,6 +740,7 @@ export class JsonStore {
       expiresAt,
       status: "pending",
     };
+
     this.data.marriageProposals.push(proposal);
     await this.save();
     return { ok: true, proposal: copyRecord(proposal) };
@@ -631,6 +749,7 @@ export class JsonStore {
   async setMarriageProposalMessage(id, channelId, messageId) {
     const proposal = this.data.marriageProposals.find((entry) => entry.id === id);
     if (!proposal || !isSnowflake(channelId) || !isSnowflake(messageId)) return false;
+
     proposal.channelId = channelId;
     proposal.messageId = messageId;
     await this.save();
@@ -640,6 +759,7 @@ export class JsonStore {
   async cancelMarriageProposal(id) {
     const proposal = this.data.marriageProposals.find((entry) => entry.id === id);
     if (!proposal || proposal.status !== "pending") return false;
+
     proposal.status = "cancelled";
     await this.save();
     return true;
@@ -653,6 +773,7 @@ export class JsonStore {
     if (!["accept", "decline"].includes(decision)) {
       return { ok: false, reason: "invalid" };
     }
+
     if (Date.parse(proposal.expiresAt) <= now) {
       proposal.status = "expired";
       await this.save();
@@ -680,8 +801,10 @@ export class JsonStore {
       proposal.recipientId,
       new Date(now).toISOString(),
     );
+
     this.data.marriages.push(marriage);
     proposal.status = "accepted";
+
     for (const other of this.data.marriageProposals) {
       if (
         other.id !== proposal.id &&
@@ -694,6 +817,7 @@ export class JsonStore {
         other.status = "cancelled";
       }
     }
+
     await this.save();
     return { ok: true, decision, marriage: copyRecord(marriage) };
   }
@@ -731,6 +855,7 @@ export class JsonStore {
       status: "pending",
       usedAt: null,
     };
+
     this.data.animeReplies.push(reply);
     await this.save();
     return copyRecord(reply);
@@ -743,6 +868,7 @@ export class JsonStore {
   async setAnimeReplyMessage(id, channelId, messageId) {
     const reply = this.data.animeReplies.find((entry) => entry.id === id);
     if (!reply || !isSnowflake(channelId) || !isSnowflake(messageId)) return false;
+
     reply.channelId = channelId;
     reply.messageId = messageId;
     await this.save();
@@ -752,6 +878,7 @@ export class JsonStore {
   async removeAnimeReply(id) {
     const index = this.data.animeReplies.findIndex((entry) => entry.id === id);
     if (index === -1) return false;
+
     this.data.animeReplies.splice(index, 1);
     await this.save();
     return true;
@@ -759,7 +886,9 @@ export class JsonStore {
 
   async cancelInteractionsForMessage(channelId, messageId) {
     if (!isSnowflake(channelId) || !isSnowflake(messageId)) return 0;
+
     let changed = 0;
+
     for (const proposal of this.data.marriageProposals) {
       if (
         proposal.status === "pending" &&
@@ -770,6 +899,7 @@ export class JsonStore {
         changed += 1;
       }
     }
+
     for (const reply of this.data.animeReplies) {
       if (
         reply.status === "pending" &&
@@ -780,6 +910,7 @@ export class JsonStore {
         changed += 1;
       }
     }
+
     for (const confirmation of this.data.divorceConfirmations) {
       if (
         confirmation.status === "pending" &&
@@ -805,6 +936,7 @@ export class JsonStore {
   ) {
     const reply = this.data.animeReplies.find((entry) => entry.id === id);
     if (!reply) return { ok: false, reason: "not-found" };
+
     if (
       reply.guildId !== guildId ||
       reply.channelId !== channelId ||
@@ -812,8 +944,10 @@ export class JsonStore {
     ) {
       return { ok: false, reason: "wrong-message" };
     }
+
     if (reply.targetId !== userId) return { ok: false, reason: "unauthorized" };
     if (reply.status !== "pending") return { ok: false, reason: "resolved" };
+
     if (Date.parse(reply.expiresAt) <= now) {
       reply.status = "expired";
       await this.save();
@@ -870,6 +1004,7 @@ export class JsonStore {
       expiresAt,
       status: "pending",
     };
+
     this.data.divorceConfirmations.push(confirmation);
     await this.save();
     return { ok: true, confirmation: copyRecord(confirmation) };
@@ -882,6 +1017,7 @@ export class JsonStore {
   async setDivorceConfirmationMessage(id, channelId, messageId) {
     const confirmation = this.data.divorceConfirmations.find((entry) => entry.id === id);
     if (!confirmation || !isSnowflake(channelId) || !isSnowflake(messageId)) return false;
+
     confirmation.channelId = channelId;
     confirmation.messageId = messageId;
     await this.save();
@@ -896,6 +1032,7 @@ export class JsonStore {
     if (!["confirm", "cancel"].includes(decision)) {
       return { ok: false, reason: "invalid" };
     }
+
     if (Date.parse(confirmation.expiresAt) <= now) {
       confirmation.status = "expired";
       await this.save();
@@ -914,6 +1051,7 @@ export class JsonStore {
         ((entry.memberA === confirmation.userId && entry.memberB === confirmation.spouseId) ||
           (entry.memberB === confirmation.userId && entry.memberA === confirmation.spouseId)),
     );
+
     if (marriageIndex === -1) {
       confirmation.status = "stale";
       await this.save();
@@ -933,6 +1071,7 @@ export class JsonStore {
     if (typeof action !== "string" || !/^[a-z]{2,20}$/.test(action)) {
       throw new Error("Invalid interaction action.");
     }
+
     const pairKey = `${actorId}:${targetId}`;
     return this.data.interactionCounts[guildId]?.[pairKey]?.[action] ?? 0;
   }
@@ -950,6 +1089,7 @@ export class JsonStore {
     this.data.interactionCounts[guildId][pairKey] ??= {};
     this.data.interactionCounts[guildId][pairKey][action] ??= 0;
     this.data.interactionCounts[guildId][pairKey][action] += 1;
+
     await this.save();
     return this.data.interactionCounts[guildId][pairKey][action];
   }
@@ -959,6 +1099,7 @@ export class JsonStore {
       () => this.writeAtomically(),
       () => this.writeAtomically(),
     );
+
     this.saveQueue = operation.catch(() => {});
     return operation;
   }
@@ -990,6 +1131,7 @@ export function parseDuration(input) {
     d: 86_400_000,
     w: 604_800_000,
   }[match[2].toLowerCase()];
+
   const milliseconds = amount * unitMilliseconds;
 
   if (
