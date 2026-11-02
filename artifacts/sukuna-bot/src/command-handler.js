@@ -2,6 +2,7 @@
 import { sendBotErrorLog, logError } from "./logging.js";
 import { UserFacingError } from "./permissions.js";
 import { handleModeration } from "./commands/moderation.js";
+import { handleSecurity } from "./commands/security.js";
 import {
   handleAnimeInteraction,
   handleAnimeReplyButton,
@@ -22,6 +23,7 @@ export function parseCommand(content) {
   if (!match) return null;
 
   const words = (match[1] ?? "").trim().split(/\s+/).filter(Boolean);
+
   return {
     command: words.shift()?.toLowerCase() ?? "",
     args: words,
@@ -44,6 +46,8 @@ export async function handleMessage(message, client, store) {
 
   const parsed = parseCommand(message.content);
 
+  // Non-command messages go through automatic moderation first,
+  // then the existing counting game.
   if (!parsed) {
     try {
       const moderated = await handleAutoModeration(message, store);
@@ -62,17 +66,49 @@ export async function handleMessage(message, client, store) {
   }
 
   if (!parsed.command) {
-    await replySafely(message, "Use `s help` to see the available commands.");
+    await replySafely(
+      message,
+      "Use `s help` to see the available commands.",
+    );
     return;
   }
 
   try {
     const handled =
-      (await handleModeration(message, parsed.command, parsed.args, store)) ||
-      (await handleRoleManagement(message, parsed.command, store)) ||
-      (await handleUtility(message, parsed.command, parsed.args, client)) ||
-      (await handleMarriageCommand(message, parsed.command, store)) ||
-      (await handleAnimeInteraction(message, parsed.command, client, store));
+      (await handleSecurity(
+        message,
+        parsed.command,
+        parsed.args,
+        store,
+      )) ||
+      (await handleModeration(
+        message,
+        parsed.command,
+        parsed.args,
+        store,
+      )) ||
+      (await handleRoleManagement(
+        message,
+        parsed.command,
+        store,
+      )) ||
+      (await handleUtility(
+        message,
+        parsed.command,
+        parsed.args,
+        client,
+      )) ||
+      (await handleMarriageCommand(
+        message,
+        parsed.command,
+        store,
+      )) ||
+      (await handleAnimeInteraction(
+        message,
+        parsed.command,
+        client,
+        store,
+      ));
 
     if (!handled) {
       await replySafely(
@@ -108,7 +144,12 @@ export async function handleInteraction(interaction, store, client) {
       await handleAnimeReplyButton(interaction, store, client) ||
       await handleMarriageButton(interaction, store);
   } catch (error) {
-    await sendBotErrorLog(interaction.guild, store, "Button interaction", error);
+    await sendBotErrorLog(
+      interaction.guild,
+      store,
+      "Button interaction",
+      error,
+    );
 
     const response = {
       content: "That action could not be completed. Try again later.",
