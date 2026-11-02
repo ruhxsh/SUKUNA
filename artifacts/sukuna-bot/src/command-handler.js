@@ -1,3 +1,4 @@
+
 import { sendBotErrorLog, logError } from "./logging.js";
 import { UserFacingError } from "./permissions.js";
 import { handleModeration } from "./commands/moderation.js";
@@ -12,6 +13,7 @@ import {
 import { handleRoleButton, handleRoleManagement } from "./commands/roles.js";
 import { handleUtility } from "./commands/utility.js";
 import { handleCountingMessage } from "./commands/counting.js";
+import { handleAutoModeration } from "./automod.js";
 
 const COMMAND_PREFIX = "s";
 
@@ -41,10 +43,24 @@ export async function handleMessage(message, client, store) {
   if (message.author?.bot || !message.guild) return;
 
   const parsed = parseCommand(message.content);
+
   if (!parsed) {
+    try {
+      const moderated = await handleAutoModeration(message, store);
+      if (moderated) return;
+    } catch (error) {
+      await sendBotErrorLog(
+        message.guild,
+        store,
+        "Automatic moderation",
+        error,
+      );
+    }
+
     await handleCountingMessage(message, store);
     return;
   }
+
   if (!parsed.command) {
     await replySafely(message, "Use `s help` to see the available commands.");
     return;
@@ -59,7 +75,10 @@ export async function handleMessage(message, client, store) {
       (await handleAnimeInteraction(message, parsed.command, client, store));
 
     if (!handled) {
-      await replySafely(message, "Unknown command. Use `s help` to see the command list.");
+      await replySafely(
+        message,
+        "Unknown command. Use `s help` to see the command list.",
+      );
     }
   } catch (error) {
     if (error instanceof UserFacingError) {
@@ -67,8 +86,17 @@ export async function handleMessage(message, client, store) {
       return;
     }
 
-    await sendBotErrorLog(message.guild, store, `Command ${parsed.command}`, error);
-    await replySafely(message, "That command could not be completed. Please try again later.");
+    await sendBotErrorLog(
+      message.guild,
+      store,
+      `Command ${parsed.command}`,
+      error,
+    );
+
+    await replySafely(
+      message,
+      "That command could not be completed. Please try again later.",
+    );
   }
 }
 
@@ -81,10 +109,12 @@ export async function handleInteraction(interaction, store, client) {
       await handleMarriageButton(interaction, store);
   } catch (error) {
     await sendBotErrorLog(interaction.guild, store, "Button interaction", error);
+
     const response = {
       content: "That action could not be completed. Try again later.",
       ephemeral: true,
     };
+
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(response).catch(() => {});
     } else {
