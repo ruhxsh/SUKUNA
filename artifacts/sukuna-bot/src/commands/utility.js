@@ -1,5 +1,5 @@
 
-import { EmbedBuilder, PermissionFlagsBits } from "discord.js";
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, PermissionFlagsBits } from "discord.js";
 import {
   requireBotChannelPermission,
   requirePermission,
@@ -7,66 +7,139 @@ import {
   UserFacingError,
 } from "../permissions.js";
 
-const HELP_GROUPS = [
+const HELP_PAGES = [
   {
-    name: "Moderation",
-    commands: [
+    title: "Getting started · 1/7",
+    description: [
+      "Commands start with `s` or `S`.",
+      "Use the buttons below to browse the help pages.",
+      "",
+      "**General utilities**",
+      "`s help` — open this paginated help center",
+      "`s ping` — show bot response latency",
+      "`s userinfo [@user]` — show account and server details",
+      "`s serverinfo` — show server information",
+      "`s av [@user]` — show an avatar",
+      "`s poll question` — create a yes/no poll",
+      "",
+      "**Staff messaging**",
+      "`s announce message` — post a staff announcement (Manage Server)",
+      "`s say message` — send as the bot here (Manage Messages)",
+      "`s say #channel message` — send as the bot in another channel",
+    ].join("\n"),
+  },
+  {
+    title: "Moderation · 2/7",
+    description: [
+      "These commands require the relevant staff permissions.",
       "`s kick @user [reason]` — kick a member",
       "`s ban @user [reason]` — ban a member",
-      "`s timeout @user duration [reason]` — timeout for up to 28 days",
+      "`s timeout @user 10m [reason]` — timeout a member",
       "`s untimeout @user` — remove a timeout",
       "`s warn @user [reason]` — save a warning",
       "`s warnings @user` — view saved warnings",
       "`s clearwarnings @user` — clear saved warnings",
-      "`s purge amount` — delete 1–100 recent messages",
-    ],
+      "`s purge 25` — delete 1–100 recent messages",
+      "",
+      "Timeout examples: `30s`, `10m`, `2h`, `1d`, `1w` (maximum 28 days).",
+    ].join("\n"),
   },
   {
-    name: "Roles and setup (staff)",
-    commands: [
+    title: "Server security · 3/7",
+    description: [
+      "Security configuration requires **Manage Server**.",
+      "",
+      "**Automatic moderation**",
+      "`s automod` — view current settings and commands",
+      "`s automod on` / `s automod off` — enable or disable",
+      "`s automod messages 6` — set message-rate limit (2–30)",
+      "`s automod duplicates 3` — set duplicate limit (2–30)",
+      "`s automod mentions 6` — set mention limit (2–30)",
+      "`s automod action warn` — choose `warn` or `timeout`",
+      "`s automod timeout 60` — set timeout seconds (1–600)",
+      "",
+      "**Raid protection**",
+      "`s raid` — view raid settings",
+      "`s raid on` / `s raid off` — enable or disable",
+      "`s raid joins 8` — set join threshold (2–30)",
+    ].join("\n"),
+  },
+  {
+    title: "Roles and server setup · 4/7",
+    description: [
+      "**Role management**",
       "`s role @user @role` — assign a role",
       "`s removerole @user @role` — remove a role",
-      "`s rolepanel` — post the self-assignable role buttons",
-      "`s addselfrole @role` / `s removeselfrole @role` — manage approved roles",
-      "`s setwelcome #channel` / `s disablewelcome` — set welcome messages",
-      "`s setmodlog #channel` / `s disablemodlog` — set action/error logging",
-      "`s setautorole @role` / `s disableautorole` — set new-member role",
-      "`s setcounting #channel` / `s disablecounting` — configure the counting game",
-      "`s config` — view this server's bot settings",
-    ],
+      "`s addselfrole @role` — approve a self-assignable role",
+      "`s removeselfrole @role` — remove it from the approved list",
+      "`s rolepanel` — publish the self-role button panel",
+      "",
+      "**Server setup** (Manage Server unless noted)",
+      "`s setwelcome #channel` / `s disablewelcome` — welcome messages",
+      "`s setmodlog #channel` / `s disablemodlog` — moderation/error logs",
+      "`s setautorole @role` / `s disableautorole` — new-member role",
+      "`s setcounting #channel` / `s disablecounting` — counting channel",
+      "`s config` — view this server's saved bot settings",
+    ].join("\n"),
   },
   {
-    name: "Server utilities",
-    commands: [
-      "`s ping` — show response latency",
-      "`s userinfo [@user]` — show account and member details",
-      "`s serverinfo` — show server details",
-      "`s av [@user]` — show an avatar (no mention shows your own)",
-      "`s poll question` — create a yes/no reaction poll",
-      "`s announce message` — post a staff-only announcement",
-      "`s say message` — send a staff-only message in the current channel",
-      "`s say #channel message` — send a staff-only message to another channel",
-    ],
+    title: "AFK and reaction roles · 5/7",
+    description: [
+      "**AFK status**",
+      "`s afk [reason]` — set your AFK status and optional reason",
+      "Sukuna notifies people who mention you and clears your AFK status when you speak again.",
+      "AFK status is saved across bot restarts.",
+      "",
+      "**Multiple reaction-role button panels** (Manage Server)",
+      "`s rr add <panel> @role <label>` — add a role button",
+      "`s rr remove <panel> @role` — remove a role from a panel",
+      "`s rr panel <panel> [title]` — publish the panel",
+      "`s rr list` — list configured panels",
+      "`s rr delete <panel>` — delete a panel configuration",
+      "",
+      "Example: `s rr add colors @Blue Blue` then `s rr panel colors`.",
+      "Only eligible roles below Sukuna's highest role can be assigned.",
+    ].join("\n"),
   },
   {
-    name: "Anime interactions",
-    commands: [
+    title: "Temporary voice rooms and tickets · 6/7",
+    description: [
+      "**Temporary voice rooms**",
+      "Staff: `s voice setup` (run while in the lobby) or `s voice setup #VoiceLobby`",
+      "Staff: `s voice disable` — disable the system and remove its tracked rooms",
+      "Room owner: `s voice rename New Name`",
+      "Room owner: `s voice limit 10` (use `0` for unlimited)",
+      "Room owner: `s voice lock` / `s voice unlock`",
+      "Room owner: `s voice hide` / `s voice reveal`",
+      "Room owner: `s voice allow @member` / `s voice deny @member`",
+      "Room owner: `s voice kick @member`",
+      "Empty temporary rooms are automatically deleted.",
+      "",
+      "**Support tickets**",
+      "Staff: `s ticket setup #TicketCategory #TranscriptChannel`",
+      "In a ticket: `s ticket claim`, `s ticket close`, `s ticket reopen`, `s ticket delete`",
+      "Closing with `s ticket close` saves a text transcript to the configured channel.",
+    ].join("\n"),
+  },
+  {
+    title: "Anime and relationships · 7/7",
+    description: [
+      "**Anime interactions**",
       "`s hug @user` · `s kiss @user` · `s pat @user` · `s cuddle @user`",
       "`s punch @user` · `s slap @user` · `s poke @user` · `s bite @user`",
       "`s wave @user` · `s highfive @user` · `s dance`",
-    ],
-  },
-  {
-    name: "Relationships",
-    commands: [
-      "`s marry @user` — propose with Accept and Decline buttons",
+      "",
+      "**Relationships**",
+      "`s marry @user` — send a proposal with Accept and Decline buttons",
       "`s married` — show your spouse",
       "`s divorce` — request confirmation before ending a marriage",
       "`s couple @user` — check your relationship",
       "`s ship @user` — show a playful compatibility score",
-      "`s proposals` — list your pending proposals",
+      "`s proposals` — list pending proposals",
       "`s marriage` — show marriage commands and your status",
-    ],
+      "",
+      "Use the Previous button to return to any earlier page.",
+    ].join("\n"),
   },
 ];
 
@@ -93,23 +166,45 @@ function requireMessageContent(args, command) {
   return content;
 }
 
-async function handleHelp(message) {
+function buildHelpPage(page) {
+  const current = Math.max(0, Math.min(HELP_PAGES.length - 1, page));
+  const data = HELP_PAGES[current];
   const embed = new EmbedBuilder()
     .setColor(0x7c3aed)
-    .setTitle("Sukuna commands")
-    .setDescription("Commands start with `s` or `S`.");
+    .setTitle(`Sukuna Help Center — ${data.title}`)
+    .setDescription(data.description)
+    .setFooter({ text: `Page ${current + 1} of ${HELP_PAGES.length} · Commands use the s prefix` });
 
-  for (const group of HELP_GROUPS) {
-    embed.addFields({
-      name: group.name,
-      value: group.commands.join("\n"),
-    });
+  const row = new ActionRowBuilder().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`sk:help:${current - 1}`)
+      .setLabel("Previous")
+      .setStyle(ButtonStyle.Secondary)
+      .setDisabled(current === 0),
+    new ButtonBuilder()
+      .setCustomId(`sk:help:${current + 1}`)
+      .setLabel("Next")
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(current === HELP_PAGES.length - 1),
+  );
+  return { embeds: [embed], components: [row], allowedMentions: { parse: [] } };
+}
+
+async function handleHelp(message) {
+  await message.reply(buildHelpPage(0));
+}
+
+export async function handleHelpInteraction(interaction) {
+  if (!interaction.isButton() || !interaction.customId?.startsWith("sk:help:")) {
+    return false;
   }
-
-  await message.reply({
-    embeds: [embed],
-    allowedMentions: { parse: [] },
-  });
+  const page = Number(interaction.customId.split(":")[2]);
+  if (!Number.isInteger(page) || page < 0 || page >= HELP_PAGES.length) {
+    await interaction.reply({ content: "That help page is no longer available.", ephemeral: true });
+    return true;
+  }
+  await interaction.update(buildHelpPage(page));
+  return true;
 }
 
 async function handleUserInfo(message) {
