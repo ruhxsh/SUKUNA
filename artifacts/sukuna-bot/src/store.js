@@ -399,6 +399,7 @@ export function normalizeStoreData(raw) {
     animeReplies: normalizeAnimeReplies(raw.animeReplies),
     divorceConfirmations: normalizeDivorceConfirmations(raw.divorceConfirmations),
     interactionCounts: normalizeInteractionCounts(raw.interactionCounts),
+    community: isRecord(raw.community) ? raw.community : { afk: {}, reactionPanels: {}, voice: {}, tickets: {} },
   };
 }
 
@@ -427,6 +428,7 @@ export class JsonStore {
       animeReplies: [],
       divorceConfirmations: [],
       interactionCounts: {},
+      community: { afk: {}, reactionPanels: {}, voice: {}, tickets: {} },
     };
     this.saveQueue = Promise.resolve();
   }
@@ -453,6 +455,7 @@ export class JsonStore {
           animeReplies: [],
           divorceConfirmations: [],
           interactionCounts: {},
+          community: { afk: {}, reactionPanels: {}, voice: {}, tickets: {} },
         };
         return this;
       }
