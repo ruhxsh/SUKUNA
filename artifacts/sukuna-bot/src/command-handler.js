@@ -12,7 +12,7 @@ import {
   handleMarriageCommand,
 } from "./commands/marriage.js";
 import { handleRoleButton, handleRoleManagement } from "./commands/roles.js";
-import { handleUtility } from "./commands/utility.js";
+import { handleHelpInteraction, handleUtility } from "./commands/utility.js";
 import { handleCountingMessage } from "./commands/counting.js";
 import { handleAutoModeration } from "./automod.js";
 import { handleCommunityCommand, handleCommunityInteraction, handleCommunityMessage } from "./commands/community.js";
@@ -144,7 +144,8 @@ export async function handleInteraction(interaction, store, client) {
   if (!interaction.isButton()) return;
 
   try {
-    await handleCommunityInteraction(interaction, store) ||
+    await handleHelpInteraction(interaction) ||
+      await handleCommunityInteraction(interaction, store) ||
       await handleRoleButton(interaction, store) ||
       await handleAnimeReplyButton(interaction, store, client) ||
       await handleMarriageButton(interaction, store);
