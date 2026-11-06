@@ -1,3 +1,4 @@
+
 import { sendBotErrorLog, logError } from "./logging.js";
 import { UserFacingError } from "./permissions.js";
 import { handleModeration } from "./commands/moderation.js";
@@ -14,10 +15,7 @@ import { handleRoleButton, handleRoleManagement } from "./commands/roles.js";
 import { handleUtility } from "./commands/utility.js";
 import { handleCountingMessage } from "./commands/counting.js";
 import { handleAutoModeration } from "./automod.js";
-import {
-  handleAfkCommand,
-  handleAfkMessage,
-} from "./commands/afk.js";
+import { handleCommunityCommand, handleCommunityInteraction, handleCommunityMessage } from "./commands/community.js";
 
 const COMMAND_PREFIX = "s";
 
@@ -47,14 +45,12 @@ async function replySafely(message, content) {
 export async function handleMessage(message, client, store) {
   if (message.author?.bot || !message.guild) return;
 
-  try {
-    await handleAfkMessage(message);
-  } catch (error) {
-    logError(error, "AFK message handler");
-  }
+  try { await handleCommunityMessage(message, store); } catch (error) { logError(error, "Community message handler"); }
 
   const parsed = parseCommand(message.content);
 
+  // Non-command messages go through automatic moderation first,
+  // then the existing counting game.
   if (!parsed) {
     try {
       const moderated = await handleAutoModeration(message, store);
@@ -73,18 +69,44 @@ export async function handleMessage(message, client, store) {
   }
 
   if (!parsed.command) {
-    await replySafely(message, "Use `s help` to see the available commands.");
+    await replySafely(
+      message,
+      "Use `s help` to see the available commands.",
+    );
     return;
   }
 
   try {
     const handled =
-      (await handleAfkCommand(message, parsed.command, parsed.args)) ||
-      (await handleSecurity(message, parsed.command, parsed.args, store)) ||
-      (await handleModeration(message, parsed.command, parsed.args, store)) ||
-      (await handleRoleManagement(message, parsed.command, store)) ||
-      (await handleUtility(message, parsed.command, parsed.args, client)) ||
-      (await handleMarriageCommand(message, parsed.command, store)) ||
+      (await handleCommunityCommand(message, parsed.command, parsed.args, store)) ||
+      (await handleSecurity(
+        message,
+        parsed.command,
+        parsed.args,
+        store,
+      )) ||
+      (await handleModeration(
+        message,
+        parsed.command,
+        parsed.args,
+        store,
+      )) ||
+      (await handleRoleManagement(
+        message,
+        parsed.command,
+        store,
+      )) ||
+      (await handleUtility(
+        message,
+        parsed.command,
+        parsed.args,
+        client,
+      )) ||
+      (await handleMarriageCommand(
+        message,
+        parsed.command,
+        store,
+      )) ||
       (await handleAnimeInteraction(
         message,
         parsed.command,
@@ -122,7 +144,8 @@ export async function handleInteraction(interaction, store, client) {
   if (!interaction.isButton()) return;
 
   try {
-    await handleRoleButton(interaction, store) ||
+    await handleCommunityInteraction(interaction, store) ||
+      await handleRoleButton(interaction, store) ||
       await handleAnimeReplyButton(interaction, store, client) ||
       await handleMarriageButton(interaction, store);
   } catch (error) {
@@ -144,6 +167,11 @@ export async function handleInteraction(interaction, store, client) {
       await interaction.reply(response).catch(() => {});
     }
   }
+}
+
+export async function handleVoiceStateUpdate(oldState, newState, store) {
+  const { handleCommunityVoiceState } = await import("./commands/community.js");
+  await handleCommunityVoiceState(oldState, newState, store);
 }
 
 export { COMMAND_PREFIX };
