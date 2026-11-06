@@ -1,21 +1,30 @@
-import { Client, Events, GatewayIntentBits } from "discord.js";
+
+import {
+  Client,
+  Events,
+  GatewayIntentBits,
+} from "discord.js";
 import { handleInteraction, handleMessage, handleVoiceStateUpdate } from "./src/command-handler.js";
-import { assignAutorole, logError, sendWelcomeMessage } from "./src/logging.js";
+import {
+  assignAutorole,
+  logError,
+  sendWelcomeMessage,
+} from "./src/logging.js";
 import { JsonStore } from "./src/store.js";
 
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildVoiceStates,
-  ],
-});
+const requiredIntents = [
+  GatewayIntentBits.Guilds,
+  GatewayIntentBits.GuildMembers,
+  GatewayIntentBits.GuildMessages,
+  GatewayIntentBits.MessageContent,
+  GatewayIntentBits.GuildVoiceStates,
+];
+
+const client = new Client({ intents: requiredIntents });
 
 async function start() {
   if (!process.env.DISCORD_TOKEN) {
-    throw new Error("DISCORD_TOKEN is missing. Set it in your host's environment variables.");
+    throw new Error("DISCORD_TOKEN is missing. Add it in Replit Secrets before starting Sukuna.");
   }
 
   const store = await JsonStore.fromEnvironment().load();
@@ -24,6 +33,7 @@ async function start() {
     console.info(
       `[Sukuna] Logged in as ${readyClient.user.tag}; connected to ${readyClient.guilds.cache.size} server(s).`,
     );
+
   });
 
   client.on(Events.MessageCreate, (message) => {
@@ -35,11 +45,12 @@ async function start() {
   });
 
   client.on(Events.VoiceStateUpdate, (oldState, newState) => {
-    void handleVoiceStateUpdate(oldState, newState, store);
+    void handleVoiceStateUpdate(oldState, newState, store).catch((error) => logError(error, "Temporary voice room handler"));
   });
 
   client.on(Events.MessageDelete, (message) => {
-    void store.cancelInteractionsForMessage(message.channelId, message.id)
+    void store
+      .cancelInteractionsForMessage(message.channelId, message.id)
       .catch((error) => logError(error, "Could not cancel buttons for a deleted message"));
   });
 
@@ -56,12 +67,17 @@ async function start() {
     void assignAutorole(member, store);
   });
 
-  client.on(Events.Error, (error) => logError(error, "Discord client error"));
+  client.on(Events.Error, (error) => {
+    logError(error, "Discord client error");
+  });
 
   await client.login(process.env.DISCORD_TOKEN);
 }
 
-process.on("unhandledRejection", (error) => logError(error, "Unhandled promise rejection"));
+process.on("unhandledRejection", (error) => {
+  logError(error, "Unhandled promise rejection");
+});
+
 process.on("uncaughtException", (error) => {
   logError(error, "Uncaught exception; stopping the bot");
   process.exit(1);
