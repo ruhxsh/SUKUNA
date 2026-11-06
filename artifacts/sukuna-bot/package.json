@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "node index.js",
     "start": "node index.js",
-    "check": "node --check index.js && node --check src/store.js && node --check src/permissions.js && node --check src/logging.js && node --check src/anime-gifs.js && node --check src/command-handler.js && node --check src/commands/moderation.js && node --check src/commands/roles.js && node --check src/commands/utility.js && node --check src/commands/counting.js && node --check src/commands/anime-interactions.js && node --check test/core.test.js",
+    "check": "node --check index.js && node --check src/store.js && node --check src/permissions.js && node --check src/logging.js && node --check src/anime-gifs.js && node --check src/command-handler.js && node --check src/commands/community.js && node --check src/commands/moderation.js && node --check src/commands/roles.js && node --check src/commands/utility.js && node --check src/commands/counting.js && node --check src/commands/anime-interactions.js && node --check test/core.test.js",
     "test": "node --test"
   },
   "dependencies": {
