@@ -198,12 +198,17 @@ export async function handleHelpInteraction(interaction) {
   if (!interaction.isButton() || !interaction.customId?.startsWith("sk:help:")) {
     return false;
   }
+  await interaction.deferUpdate();
   const page = Number(interaction.customId.split(":")[2]);
   if (!Number.isInteger(page) || page < 0 || page >= HELP_PAGES.length) {
-    await interaction.reply({ content: "That help page is no longer available.", ephemeral: true });
+    await interaction.editReply({
+      content: "That help page is no longer available.",
+      embeds: [],
+      components: [],
+    });
     return true;
   }
-  await interaction.update(buildHelpPage(page));
+  await interaction.editReply(buildHelpPage(page));
   return true;
 }
 
