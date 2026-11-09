@@ -1,6 +1,6 @@
 import {
   ActionRowBuilder, ButtonBuilder, ButtonStyle, ChannelType,
-  EmbedBuilder, PermissionFlagsBits, PermissionsBitField,
+  EmbedBuilder, MessageFlags, PermissionFlagsBits, PermissionsBitField,
 } from 'discord.js';
 import { randomUUID } from 'node:crypto';
 
@@ -207,9 +207,13 @@ export async function handleCommunityCommand(message, command, args, store) {
         return true;
       }
 
+      const memberVoiceChannelId = message.member?.voice?.channelId;
+      const memberVoiceChannel = memberVoiceChannelId
+        ? await message.guild.channels.fetch(memberVoiceChannelId).catch(() => null)
+        : null;
       const lobby =
         message.mentions.channels.first() ||
-        message.member.voice.channel;
+        memberVoiceChannel;
 
       if (!lobby || lobby.type !== ChannelType.GuildVoice) {
         await say(message,
@@ -250,7 +254,10 @@ export async function handleCommunityCommand(message, command, args, store) {
       return true;
     }
 
-    const room = message.member.voice.channel;
+    const roomId = message.member?.voice?.channelId;
+    const room = roomId
+      ? await message.guild.channels.fetch(roomId).catch(() => null)
+      : null;
     const rec = room && db.voice[gid]?.rooms?.[room.id];
 
     if (!rec || rec.ownerId !== message.author.id) {
@@ -497,10 +504,21 @@ export async function handleCommunityInteraction(interaction, store) {
     return false;
   }
 
+  const parts = interaction.customId.split(':');
+  if (!['rr', 'ticket'].includes(parts[1])) return false;
+
+  if (!interaction.inGuild?.() || !interaction.guild) {
+    await interaction.reply({
+      content: 'Use this button in the server where it was posted.',
+      flags: MessageFlags.Ephemeral,
+    });
+    return true;
+  }
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
   const db = state(store);
   const gid = interaction.guildId;
-  const parts = interaction.customId.split(':');
-
   if (parts[1] === 'rr') {
     const panelName = parts[2];
     const roleId = parts[3];
@@ -511,9 +529,8 @@ export async function handleCommunityInteraction(interaction, store) {
       : (panels[panelName] || []);
 
     if (!allowed.some(x => x.roleId === roleId)) {
-      await interaction.reply({
+      await interaction.editReply({
         content: 'This role button is no longer active.',
-        ephemeral: true,
       });
       return true;
     }
@@ -536,9 +553,8 @@ export async function handleCommunityInteraction(interaction, store) {
         PermissionFlagsBits.ModerateMembers,
       ].some(flag => role.permissions.has(flag))
     ) {
-      await interaction.reply({
+      await interaction.editReply({
         content: 'This role cannot be assigned.',
-        ephemeral: true,
       });
       return true;
     }
@@ -547,15 +563,13 @@ export async function handleCommunityInteraction(interaction, store) {
 
     if (member.roles.cache.has(roleId)) {
       await member.roles.remove(role);
-      await interaction.reply({
+      await interaction.editReply({
         content: `Removed ${role.name}.`,
-        ephemeral: true,
       });
     } else {
       await member.roles.add(role);
-      await interaction.reply({
+      await interaction.editReply({
         content: `Added ${role.name}.`,
-        ephemeral: true,
       });
     }
 
@@ -566,9 +580,8 @@ export async function handleCommunityInteraction(interaction, store) {
     const cfg = db.tickets[gid];
 
     if (!cfg) {
-      await interaction.reply({
+      await interaction.editReply({
         content: 'Tickets are not configured.',
-        ephemeral: true,
       });
       return true;
     }
@@ -580,9 +593,8 @@ export async function handleCommunityInteraction(interaction, store) {
         t => t.ownerId === interaction.user.id && !t.closed
       )
     ) {
-      await interaction.reply({
+      await interaction.editReply({
         content: 'You already have an open ticket.',
-        ephemeral: true,
       });
       return true;
     }
@@ -651,9 +663,8 @@ export async function handleCommunityInteraction(interaction, store) {
       allowedMentions: { users: [interaction.user.id] },
     });
 
-    await interaction.reply({
+    await interaction.editReply({
       content: `Ticket created: ${channel}`,
-      ephemeral: true,
     });
 
     return true;
@@ -670,9 +681,8 @@ export async function handleCommunityInteraction(interaction, store) {
         !interaction.memberPermissions?.has(PermissionFlagsBits.ManageChannels)
       )
     ) {
-      await interaction.reply({
+      await interaction.editReply({
         content: 'Only the ticket owner or staff can close this ticket.',
-        ephemeral: true,
       });
       return true;
     }
@@ -686,9 +696,8 @@ export async function handleCommunityInteraction(interaction, store) {
 
     await save(store);
 
-    await interaction.reply({
+    await interaction.editReply({
       content: 'Ticket closed. Staff can reopen or delete it.',
-      ephemeral: true,
     });
 
     return true;
@@ -735,25 +744,36 @@ export async function handleCommunityVoiceState(oldState, newState, store) {
 
   if (!cfg) return;
 
+  const oldChannel = oldState.channelId
+    ? await guild.channels.fetch(oldState.channelId).catch(() => null)
+    : null;
+  const newChannel = newState.channelId
+    ? await guild.channels.fetch(newState.channelId).catch(() => null)
+    : null;
+
   if (
     oldState.channelId &&
     cfg.rooms?.[oldState.channelId] &&
-    oldState.channel?.members.size === 0
+    (!oldChannel || oldChannel.members.size === 0)
   ) {
-    await oldState.channel.delete('Temporary room is empty').catch(() => {});
+    if (oldChannel) {
+      await oldChannel.delete('Temporary room is empty').catch(() => {});
+    }
     delete cfg.rooms[oldState.channelId];
     await save(store);
   }
 
   if (newState.channelId !== cfg.lobbyId) return;
 
-  const member = newState.member;
-  if (!member) return;
+  const member =
+    newState.member ??
+    (newState.id ? await guild.members.fetch(newState.id).catch(() => null) : null);
+  if (!member || !newChannel) return;
 
   const room = await guild.channels.create({
     name: `${safeName(member.user.username)}'s-room`,
     type: ChannelType.GuildVoice,
-    parent: newState.channel.parentId || undefined,
+    parent: newChannel.parentId || undefined,
     permissionOverwrites: [
       {
         id: guild.id,
