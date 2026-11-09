@@ -15,7 +15,11 @@ import { handleRoleButton, handleRoleManagement } from "./commands/roles.js";
 import { handleHelpInteraction, handleUtility } from "./commands/utility.js";
 import { handleCountingMessage } from "./commands/counting.js";
 import { handleAutoModeration } from "./automod.js";
-import { handleCommunityCommand, handleCommunityInteraction, handleCommunityMessage } from "./commands/community.js";
+import {
+  handleCommunityCommand,
+  handleCommunityInteraction,
+  handleCommunityMessage,
+} from "./commands/community.js";
 
 const COMMAND_PREFIX = "s";
 
@@ -45,12 +49,13 @@ async function replySafely(message, content) {
 export async function handleMessage(message, client, store) {
   if (message.author?.bot || !message.guild) return;
 
-  try { await handleCommunityMessage(message, store); } catch (error) { logError(error, "Community message handler"); }
+  // Process AFK notifications separately so they do not delay commands.
+  void handleCommunityMessage(message, store).catch((error) => {
+    logError(error, "Community message handler");
+  });
 
   const parsed = parseCommand(message.content);
 
-  // Non-command messages go through automatic moderation first,
-  // then the existing counting game.
   if (!parsed) {
     try {
       const moderated = await handleAutoModeration(message, store);
@@ -79,34 +84,11 @@ export async function handleMessage(message, client, store) {
   try {
     const handled =
       (await handleCommunityCommand(message, parsed.command, parsed.args, store)) ||
-      (await handleSecurity(
-        message,
-        parsed.command,
-        parsed.args,
-        store,
-      )) ||
-      (await handleModeration(
-        message,
-        parsed.command,
-        parsed.args,
-        store,
-      )) ||
-      (await handleRoleManagement(
-        message,
-        parsed.command,
-        store,
-      )) ||
-      (await handleUtility(
-        message,
-        parsed.command,
-        parsed.args,
-        client,
-      )) ||
-      (await handleMarriageCommand(
-        message,
-        parsed.command,
-        store,
-      )) ||
+      (await handleSecurity(message, parsed.command, parsed.args, store)) ||
+      (await handleModeration(message, parsed.command, parsed.args, store)) ||
+      (await handleRoleManagement(message, parsed.command, store)) ||
+      (await handleUtility(message, parsed.command, parsed.args, client)) ||
+      (await handleMarriageCommand(message, parsed.command, store)) ||
       (await handleAnimeInteraction(
         message,
         parsed.command,
