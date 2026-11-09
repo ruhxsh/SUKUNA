@@ -103,25 +103,40 @@ export async function sendWelcomeMessage(member, store) {
   }
 }
 
+const reportedAutoroleProblems = new Set();
+
 export async function assignAutorole(member, store) {
   const roleId = store.getGuildConfig(member.guild.id).autoRoleId;
   if (!roleId) return;
 
+  const problemKey = member.guild.id + ":" + roleId;
   try {
     const role = await member.guild.roles.fetch(roleId);
     if (!role) throw new Error("Configured autorole no longer exists.");
 
-    const botMember = member.guild.members.me;
+    const botMember =
+      member.guild.members.me ??
+      (await member.guild.members.fetchMe().catch(() => null));
+
     if (!botMember?.permissions.has("ManageRoles")) {
-      throw new Error("The bot is missing Manage Roles.");
+      throw new Error("Sukuna needs the Manage Roles permission.");
     }
-    if (role.comparePositionTo(botMember.roles.highest) >= 0 || role.managed) {
-      throw new Error("The configured autorole is not manageable by the bot.");
+    if (role.managed) {
+      throw new Error("The configured autorole is integration-managed and cannot be assigned.");
+    }
+    if (role.comparePositionTo(botMember.roles.highest) >= 0) {
+      throw new Error(
+        "Move Sukuna's bot role above the configured autorole in Server Settings > Roles, then run s setautorole @role again.",
+      );
     }
 
     await member.roles.add(role, "Sukuna automatic member role");
+    reportedAutoroleProblems.delete(problemKey);
   } catch (error) {
-    await sendBotErrorLog(member.guild, store, "Autorole assignment", error);
+    if (!reportedAutoroleProblems.has(problemKey)) {
+      reportedAutoroleProblems.add(problemKey);
+      await sendBotErrorLog(member.guild, store, "Autorole assignment", error);
+    }
   }
 }
 
