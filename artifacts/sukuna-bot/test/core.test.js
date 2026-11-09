@@ -82,12 +82,12 @@ test("all requested anime action commands map to documented GIF API actions", ()
     "dance",
   ]);
   assert.deepEqual(ANIME_INTERACTION_COMMANDS, SUPPORTED_ANIME_GIF_ACTIONS);
-  assert.equal(DEFAULT_ANIME_GIF_API_BASE_URL, "https://api.gifukai.com/v1");
+  assert.equal(DEFAULT_ANIME_GIF_API_BASE_URL, "https://nekos.best/api/v2");
 
   for (const action of ANIME_INTERACTION_COMMANDS) {
     assert.equal(
       new URL(buildAnimeGifApiUrl(action)).pathname,
-      `/v1/${action}`,
+      `/api/v2/${action}`,
     );
   }
   assert.throws(() => buildAnimeGifApiUrl("not-an-action"), /Unsupported/);
@@ -95,6 +95,27 @@ test("all requested anime action commands map to documented GIF API actions", ()
     () => buildAnimeGifApiUrl("hug", "http://api.gifukai.com/v1"),
     /HTTPS/,
   );
+});
+
+test("Nekos.best GIF response is parsed without a second media request", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push({ url, options });
+    return new Response(
+      JSON.stringify({
+        results: [{
+          anime_name: "Test Anime",
+          url: "https://nekos.best/api/v2/hug/sample.gif",
+        }],
+      }),
+      { status: 200, headers: { "content-type": "application/json" } },
+    );
+  };
+  const result = await fetchAnimeGif("hug", { fetchImpl });
+  assert.equal(result.url, "https://nekos.best/api/v2/hug/sample.gif");
+  assert.equal(result.anime, "Test Anime");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, "https://nekos.best/api/v2/hug");
 });
 
 test("GIF fetch validates metadata and confirms the image is reachable", async () => {
