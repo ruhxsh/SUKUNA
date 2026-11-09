@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  MessageFlags,
   PermissionFlagsBits,
 } from "discord.js";
 import { sendBotErrorLog, sendModerationLog } from "../logging.js";
@@ -299,18 +300,20 @@ export async function handleRoleManagement(message, command, store) {
 export async function handleRoleButton(interaction, store) {
   if (!interaction.customId.startsWith("sukuna:role:")) return false;
 
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
   try {
     if (!interaction.inGuild() || !interaction.guild) {
-      await interaction.reply({ content: "Use this role panel in a server.", ephemeral: true });
+      await interaction.editReply({ content: "Use this role panel in a server.", ephemeral: true });
       return true;
     }
 
     const roleId = interaction.customId.slice("sukuna:role:".length);
     const config = store.getGuildConfig(interaction.guild.id);
     if (!config.selfAssignableRoleIds.includes(roleId)) {
-      await interaction.reply({
+      await interaction.editReply({
         content: "That role is no longer available. Ask a moderator to post an updated panel.",
-        ephemeral: true,
+        
       });
       return true;
     }
@@ -334,14 +337,14 @@ export async function handleRoleButton(interaction, store) {
 
     if (member.roles.cache.has(role.id)) {
       await member.roles.remove(role, "Member used the Sukuna self-role panel");
-      await interaction.reply({ content: `Removed **${role.name}**.`, ephemeral: true });
+      await interaction.editReply({ content: `Removed **${role.name}**.`, ephemeral: true });
     } else {
       await member.roles.add(role, "Member used the Sukuna self-role panel");
-      await interaction.reply({ content: `Added **${role.name}**.`, ephemeral: true });
+      await interaction.editReply({ content: `Added **${role.name}**.`, ephemeral: true });
     }
   } catch (error) {
     if (error instanceof UserFacingError) {
-      await interaction.reply({ content: error.message, ephemeral: true }).catch(() => {});
+      await interaction.editReply({ content: error.message, ephemeral: true }).catch(() => {});
     } else {
       await sendBotErrorLog(interaction.guild, store, "Role panel button", error);
       await interaction
