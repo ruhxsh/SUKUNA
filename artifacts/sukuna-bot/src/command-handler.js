@@ -1,4 +1,5 @@
 
+import { MessageFlags } from "discord.js";
 import { sendBotErrorLog, logError } from "./logging.js";
 import { UserFacingError } from "./permissions.js";
 import { handleModeration } from "./commands/moderation.js";
@@ -48,6 +49,19 @@ async function replySafely(message, content) {
 
 export async function handleMessage(message, client, store) {
   if (message.author?.bot || !message.guild) return;
+
+  const channelId = message.channelId;
+  if (
+    channelId &&
+    client?.channels?.fetch &&
+    !client.channels.cache?.has(channelId)
+  ) {
+    const channel = await client.channels.fetch(channelId).catch((error) => {
+      logError(error, "Could not fetch the channel for an incoming server message");
+      return null;
+    });
+    if (!channel) return;
+  }
 
   // Process AFK notifications separately so they do not delay commands.
   void handleCommunityMessage(message, store).catch((error) => {
@@ -141,7 +155,7 @@ export async function handleInteraction(interaction, store, client) {
 
     const response = {
       content: "That action could not be completed. Try again later.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     };
 
     if (interaction.replied || interaction.deferred) {
