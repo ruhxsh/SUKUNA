@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  MessageFlags,
 } from "discord.js";
 import { logError } from "../logging.js";
 import { UserFacingError } from "../permissions.js";
@@ -345,7 +346,7 @@ function componentContextMatches(interaction, record) {
 }
 
 async function privateReply(interaction, content) {
-  const payload = { content, ephemeral: true };
+  const payload = { content, flags: MessageFlags.Ephemeral };
   if (interaction.deferred || interaction.replied) {
     await interaction.followUp(payload).catch(() => {});
   } else {
@@ -405,7 +406,6 @@ async function handleProposalButton(interaction, store, proposalId, decision) {
     return true;
   }
 
-  await interaction.deferUpdate();
   const result = await store.respondToMarriageProposal(
     proposalId,
     interaction.user.id,
@@ -476,7 +476,6 @@ async function handleDivorceButton(interaction, store, confirmationId, decision)
     return true;
   }
 
-  await interaction.deferUpdate();
   const result = await store.resolveDivorceConfirmation(
     confirmationId,
     interaction.user.id,
@@ -512,6 +511,8 @@ export async function handleMarriageButton(interaction, store) {
       !interaction.customId?.startsWith("sukuna:divorce:")) {
     return false;
   }
+
+  await interaction.deferUpdate();
 
   const [, type, recordId, decision, extra] = interaction.customId.split(":");
   if (!recordId || extra !== undefined) {
