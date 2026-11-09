@@ -3,6 +3,7 @@ import {
   ButtonBuilder,
   ButtonStyle,
   EmbedBuilder,
+  MessageFlags,
   PermissionFlagsBits,
 } from "discord.js";
 import { fetchAnimeGif } from "../anime-gifs.js";
@@ -300,7 +301,7 @@ export async function handleAnimeInteraction(
 }
 
 async function privateReply(interaction, content) {
-  const payload = { content, ephemeral: true };
+  const payload = { content, flags: MessageFlags.Ephemeral };
   if (interaction.deferred || interaction.replied) {
     await interaction.followUp(payload).catch(() => {});
   } else {
@@ -325,6 +326,8 @@ export async function handleAnimeReplyButton(
 ) {
   const prefix = "sukuna:anime-reply:";
   if (!interaction.customId?.startsWith(prefix)) return false;
+
+  await interaction.deferUpdate();
 
   const id = interaction.customId.slice(prefix.length);
   const record = store.getAnimeReply(id);
@@ -356,7 +359,6 @@ export async function handleAnimeReplyButton(
     return true;
   }
 
-  await interaction.deferUpdate();
   const result = await store.consumeAnimeReply(
     id,
     interaction.user.id,
