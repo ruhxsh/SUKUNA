@@ -180,7 +180,7 @@ export async function handleModerationCommand(message, args, store) {
       const records = store.getWarnings(guild.id, targetId);
       if (!records.length) return void await message.reply("That user has no warnings on record.");
       const embed = new EmbedBuilder().setTitle("Warnings for " + targetId).setDescription(records.slice(0, 12).map(w =>
-        "**Warning #" + (records.indexOf(w) + 1) + "**\nReason: " + w.reason + "\nModerator: <@" + w.moderatorId + ">\nDate: " + w.createdAt
+        "**Warning #" + w.number + "**\nReason: " + w.reason + "\nModerator: <@" + w.moderatorId + ">\nDate: " + w.createdAt
       ).join("\n\n").slice(0, 4000));
       return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
@@ -197,10 +197,10 @@ export async function handleModerationCommand(message, args, store) {
     const warningNumber = Number(args[1]);
     if (!Number.isInteger(warningNumber) || warningNumber < 1) return void await message.reply("Usage: s removewarn USER_ID WARNING_NUMBER. Example: s removewarn 123456789012345678 2.");
     const currentWarnings = store.getWarnings(guild.id, targetId);
-    const selectedWarning = currentWarnings[warningNumber - 1];
+    const selectedWarning = currentWarnings.find(w => w.number === warningNumber);
     if (!selectedWarning) return void await message.reply("That warning number does not exist for this member. Use s warnings USER_ID to see the current numbers.");
     try {
-      const removed = await store.removeWarning(guild.id, targetId, selectedWarning.id);
+      const removed = await store.removeWarning(guild.id, targetId, warningNumber);
       if (!removed) return void await message.reply("That warning could not be found. Check the list again.");
       await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Removed warning #" + warningNumber, result: "success" });
       return void await message.reply("Removed Warning #" + warningNumber + " for <@" + targetId + ">.");
@@ -224,7 +224,7 @@ export async function handleModerationCommand(message, args, store) {
       const record = await store.addWarning({ guildId: guild.id, targetId, moderatorId: message.author.id, reason });
       await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason, result: "success" });
       const numberedWarnings = store.getWarnings(guild.id, targetId);
-      const warningNumber = numberedWarnings.findIndex(item => item.id === record.id) + 1;
+      const warningNumber = record.number;
       return void await message.reply("Warning #" + warningNumber + " recorded for <@" + targetId + ">.");
     } catch (error) {
       await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Could not persist warning: " + error.message, result: "failed" });
