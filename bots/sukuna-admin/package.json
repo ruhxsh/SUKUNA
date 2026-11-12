@@ -1,10 +1,10 @@
 {
   "name": "sukuna-admin-security",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "main": "index.js",
-  "scripts": { "start": "node index.js", "test": "node --test" },
+  "scripts": { "start": "node index.js", "test": "node --test", "check": "node --check index.js && node --check src/commands/moderation.js && node --check src/security.js && node --check src/store.js" },
   "engines": { "node": ">=22.0.0" },
   "dependencies": { "discord.js": "^14.27.0" }
 }
