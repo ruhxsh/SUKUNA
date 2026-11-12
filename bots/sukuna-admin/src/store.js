@@ -19,7 +19,7 @@ function normalizeConfig(input) {
     modLogChannelId: snowflake(config.modLogChannelId) ? config.modLogChannelId : null,
     automod: {
       enabled: automod.enabled === true,
-      action: ["alert", "delete"].includes(automod.action) ? automod.action : "delete",
+      action: ["alert", "delete"].includes(automod.action) ? automod.action : DEFAULT_CONFIG.automod.action,
       maxMessages: Number.isInteger(automod.maxMessages) ? Math.min(30, Math.max(3, automod.maxMessages)) : DEFAULT_CONFIG.automod.maxMessages,
       intervalMs: Number.isInteger(automod.intervalMs) ? Math.min(60000, Math.max(3000, automod.intervalMs)) : DEFAULT_CONFIG.automod.intervalMs,
       duplicateLimit: Number.isInteger(automod.duplicateLimit) ? Math.min(10, Math.max(2, automod.duplicateLimit)) : DEFAULT_CONFIG.automod.duplicateLimit,
@@ -32,14 +32,17 @@ function normalizeConfig(input) {
       raidProtectionEnabled: security.raidProtectionEnabled === true,
       raidJoinLimit: Number.isInteger(security.raidJoinLimit) ? Math.min(100, Math.max(3, security.raidJoinLimit)) : DEFAULT_CONFIG.security.raidJoinLimit,
       raidWindowMs: Number.isInteger(security.raidWindowMs) ? Math.min(300000, Math.max(5000, security.raidWindowMs)) : DEFAULT_CONFIG.security.raidWindowMs,
-      raidAction: "alert",
-      alertCooldownMs: Number.isInteger(security.alertCooldownMs) ? Math.min(600000, Math.max(10000, security.alertCooldownMs)) : DEFAULT_CONFIG.security.alertCooldownMs
+      alertCooldownMs: Number.isInteger(security.alertCooldownMs) ? Math.min(600000, Math.max(10000, security.alertCooldownMs)) : DEFAULT_CONFIG.security.alertCooldownMs,
+      accountAgeAlertsEnabled: security.accountAgeAlertsEnabled === true,
+      minimumAccountAgeDays: Number.isInteger(security.minimumAccountAgeDays) ? Math.min(365, Math.max(1, security.minimumAccountAgeDays)) : DEFAULT_CONFIG.security.minimumAccountAgeDays
     }
   };
 }
 
 function normalizeState(value) {
-  if (!isObject(value) || !isObject(value.guilds)) return emptyState();
+  if (!isObject(value) || value.version !== 2 || !isObject(value.guilds)) {
+    throw new Error("Database structure or version is invalid.");
+  }
   const state = emptyState();
   for (const [guildId, guild] of Object.entries(value.guilds)) {
     if (!snowflake(guildId) || !isObject(guild)) continue;
@@ -48,7 +51,7 @@ function normalizeState(value) {
       snowflake(w.targetId) && snowflake(w.moderatorId) &&
       typeof w.reason === "string" && typeof w.createdAt === "string" &&
       !Number.isNaN(Date.parse(w.createdAt))
-    ).map(w => ({ id: w.id, targetId: w.targetId, moderatorId: w.moderatorId, reason: w.reason.slice(0, 500), createdAt: w.createdAt })) : [];
+    ).map(w => ({ id: w.id.slice(0, 80), targetId: w.targetId, moderatorId: w.moderatorId, reason: w.reason.slice(0, 500), createdAt: w.createdAt })) : [];
     state.guilds[guildId] = { config: normalizeConfig(guild.config), warnings };
   }
   return state;
@@ -63,14 +66,20 @@ export class JsonStore {
 
   async init() {
     await fs.mkdir(path.dirname(this.filePath), { recursive: true });
+    let raw;
     try {
-      this.state = normalizeState(JSON.parse(await fs.readFile(this.filePath, "utf8")));
+      raw = await fs.readFile(this.filePath, "utf8");
     } catch (error) {
-      if (error.code !== "ENOENT") {
-        const backup = this.filePath + ".corrupt-" + Date.now();
-        await fs.rename(this.filePath, backup).catch(() => {});
-        console.error("Invalid database moved to " + backup + ": " + error.message);
-      }
+      if (error.code !== "ENOENT") throw error;
+      await this.persist();
+      return this;
+    }
+    try {
+      this.state = normalizeState(JSON.parse(raw));
+    } catch (error) {
+      const backup = this.filePath + ".corrupt-" + Date.now();
+      await fs.rename(this.filePath, backup);
+      console.error("Invalid database moved to " + backup + ": " + error.message);
       this.state = emptyState();
       await this.persist();
     }
