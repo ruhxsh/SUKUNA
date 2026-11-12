@@ -57,7 +57,11 @@ export async function handleModerationCommand(message, args, store) {
 
   if (command === "setmodlog") {
     const channel = message.mentions.channels.first();
-    if (!channel?.isTextBased() || !channel.send) return void await message.reply("Mention a text channel: s setmodlog #moderation-logs.");
+    if (!channel?.isTextBased() || !channel.send || channel.guild?.id !== guild.id) return void await message.reply("Mention a text channel in this server: s setmodlog #moderation-logs.");
+    const channelPermissions = channel.permissionsFor(botMember);
+    if (!channelPermissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks])) {
+      return void await message.reply("I need View Channel, Send Messages, and Embed Links in that channel before it can be used for moderation logs.");
+    }
     await store.updateConfig(guild.id, config => ({ ...config, modLogChannelId: channel.id }));
     await message.reply("Moderation logs will be sent to <#" + channel.id + ">.");
     return;
