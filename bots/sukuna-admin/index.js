@@ -2,6 +2,7 @@ import { Client, GatewayIntentBits } from "discord.js";
 import { PREFIX, getDataFilePath } from "./src/config.js";
 import { JsonStore } from "./src/store.js";
 import { handleModerationCommand } from "./src/commands/moderation.js";
+import { handleAutomodMessage, handleRaidJoin } from "./src/security.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -10,12 +11,7 @@ if (!token) {
 }
 
 const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent
-  ]
+  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
 });
 const store = await new JsonStore(getDataFilePath()).init();
 
@@ -26,19 +22,25 @@ client.once("ready", readyClient => {
 
 client.on("messageCreate", async message => {
   if (!message.guild || message.author.bot) return;
-  const content = message.content.trim();
-  if (content.slice(0, PREFIX.length).toLowerCase() !== PREFIX) return;
-  if (content.length > PREFIX.length && !/\s/.test(content[PREFIX.length])) return;
-  const remainder = content.slice(PREFIX.length).trim();
-  if (!remainder) return;
-  const args = remainder.match(/"[^"]*"|'[^']*'|\S+/g) || [];
-  for (let i = 0; i < args.length; i++) args[i] = args[i].replace(/^["']|["']$/g, "");
   try {
+    await handleAutomodMessage(message, store);
+    const content = message.content.trim();
+    if (content.slice(0, PREFIX.length).toLowerCase() !== PREFIX) return;
+    if (content.length > PREFIX.length && !/\s/.test(content[PREFIX.length])) return;
+    const remainder = content.slice(PREFIX.length).trim();
+    if (!remainder) return;
+    const args = remainder.match(/"[^"]*"|'[^']*'|\S+/g) || [];
+    for (let i = 0; i < args.length; i++) args[i] = args[i].replace(/^["']|["']$/g, "");
     await handleModerationCommand(message, args, store);
   } catch (error) {
-    console.error("Command failed:", error);
-    await message.reply("An unexpected error occurred while processing that command.").catch(() => {});
+    console.error("Message processing failed:", error);
+    if (message.channel?.send) await message.reply("An unexpected error occurred while processing that message.").catch(() => {});
   }
+});
+
+client.on("guildMemberAdd", async member => {
+  try { await handleRaidJoin(member, store); }
+  catch (error) { console.error("Raid detection failed:", error); }
 });
 
 client.on("error", error => console.error("Discord client error:", error));
@@ -47,5 +49,4 @@ process.on("uncaughtException", error => {
   console.error("Uncaught exception:", error);
   process.exit(1);
 });
-
 await client.login(token);
