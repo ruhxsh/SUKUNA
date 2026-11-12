@@ -44,7 +44,7 @@ Automod, raid detection, and account-age alerts are OFF by default. Automod can 
 - `s security account-age on|off`
 - `s security account-age-days 7`
 
-Moderation actions require their matching Discord permission. Configuration, warning deletion, and warning clearing require Manage Server. Warnings store target ID, moderator ID, reason, timestamp, and a hidden unique record ID, and remain available after a member leaves. Warning lists show simple per-member numbers (Warning #1, #2, etc.); use the number shown with `s removewarn USER_ID WARNING_NUMBER`.
+Moderation actions require their matching Discord permission. Configuration, warning deletion, and warning clearing require Manage Server. Warnings store target ID, moderator ID, reason, timestamp, and a hidden unique record ID, and remain available after a member leaves. Warning lists show simple per-member numbers (Warning #1, #2, etc.). Numbers remain stable when other warnings are removed; use the number shown with `s removewarn USER_ID WARNING_NUMBER`.
 
 ## Security behavior
 - **Automod:** per-user message-rate, repeated-message, mass-mention (including @everyone/@here), optional Discord invite-link filtering, and configured phrase detection. Channel/role exemptions are configurable. Alert/delete action is configurable.
