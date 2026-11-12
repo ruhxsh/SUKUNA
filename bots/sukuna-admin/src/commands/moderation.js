@@ -15,12 +15,15 @@ const parseDuration = input => {
 async function execute(message, store, action, targetId, reason, operation, duration = "N/A") {
   try {
     await operation();
-    await logModeration(message.client, store, message.guild, { action, targetId, moderatorId: message.author.id, reason, duration, result: "success" });
-    await message.reply({ content: "Completed " + action + " for <@" + targetId + ">.", allowedMentions: { parse: [] } });
   } catch (error) {
     await logModeration(message.client, store, message.guild, { action, targetId, moderatorId: message.author.id, reason: reason + " | Error: " + error.message, duration, result: "failed" });
-    await message.reply("Could not complete " + action + ": " + error.message.slice(0, 250));
+    await message.reply("Could not complete " + action + ": " + error.message.slice(0, 250)).catch(() => {});
+    return;
   }
+  await logModeration(message.client, store, message.guild, { action, targetId, moderatorId: message.author.id, reason, duration, result: "success" });
+  await message.reply({ content: "Completed " + action + " for <@" + targetId + ">.", allowedMentions: { parse: [] } }).catch(error => {
+    console.warn("Moderation action succeeded, but confirmation could not be sent:", error.message);
+  });
 }
 
 export async function handleModerationCommand(message, args, store) {
@@ -48,7 +51,7 @@ export async function handleModerationCommand(message, args, store) {
       "s timeout @member 10m [reason]\ns untimeout @member [reason]\ns warn @member [reason]\n" +
       "s warnings USER_ID\ns removewarn USER_ID WARNING_ID\ns clearwarnings USER_ID\n" +
       "s setmodlog #channel\ns disablemodlog\ns automod on|off|status\n" +
-      "s automod block add|remove \"phrase\"\ns raid on|off|status\ns raid limit 10");
+      "s automod block add|remove \"phrase\"\ns automod ignore channel|role add|remove\ns raid on|off|status\ns raid limit 10\ns security status\ns security account-age on|off\ns security account-age-days 7");
     return;
   }
 
