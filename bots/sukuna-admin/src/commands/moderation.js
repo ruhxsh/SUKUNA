@@ -12,14 +12,6 @@ const parseDuration = input => {
   return Number.isSafeInteger(ms) && ms >= 1000 && ms <= 28 * 86400000 ? ms : null;
 };
 
-async function resolveTarget(message, raw) {
-  const token = raw || "";
-  const mentionId = /^<@!?([0-9]{17,20})>$/.exec(token)?.[1];
-  const id = mentionId || token;
-  if (!isSnowflake(id)) return null;
-  return message.guild.members.fetch(id).catch(() => null);
-}
-
 async function execute(message, store, action, targetId, reason, operation, duration = "N/A") {
   try {
     await operation();
