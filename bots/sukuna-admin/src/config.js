@@ -8,6 +8,7 @@ export const DEFAULT_CONFIG = Object.freeze({
   automod: {
     enabled: false,
     action: "delete",
+    blockInvites: false,
     maxMessages: 6,
     intervalMs: 7000,
     duplicateLimit: 4,
