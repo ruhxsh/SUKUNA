@@ -1,15 +1,21 @@
 # SUKUNA — Administration & Security
 
-Independent Discord bot for moderation, warnings, moderation logs, configurable message automod, and conservative join-rate raid alerts. It does not own social, gaming, music, community, voice, economy, giveaway, or general utility features.
+Independent Discord bot for server moderation, persistent warnings, moderation logs, configurable message automod, join-rate raid alerts, new-account age alerts, and audit-log permission anomaly alerts. It does not own social, gaming, music, community, voice, economy, giveaway, or general utility features.
+
+## Release status and safety
+This is a controlled-server testing release. Automated checks cover syntax, persistence, and selected security logic. A real Discord server test is still required before relying on it for enforcement. No automated raid punishment is performed.
+
+Automod, raid detection, and account-age alerts are OFF by default. Automod can alert or delete only; it never automatically times out or bans. Raid, new-account, and audit-log anomaly detections only create alerts. Account age and join rate are heuristics, not proof of abuse. Configure thresholds conservatively and review alerts manually.
 
 ## Requirements and setup
 - Node.js 22+
-- A dedicated Discord application and bot token
-- Persistent host storage
+- A dedicated Discord application and bot token (do not reuse another SUKUNA bot's token)
+- Persistent host storage; one running process per data directory
 - Enable **Message Content Intent** and **Server Members Intent** in the Developer Portal.
 - OAuth2 scopes: `bot` and `applications.commands` (slash commands are not implemented in this release; prefix commands are active).
-- Bot permissions: View Channels, Send Messages, Embed Links, Read Message History, Manage Messages, Kick Members, Ban Members, Moderate Members. Add View Audit Log only if a future audited security feature requires it. Do not grant Administrator.
-- Keep the bot role below the server owner/admin roles and above roles it is authorized to moderate.
+- Bot permissions: View Channels, Send Messages, Embed Links, Read Message History, Manage Messages, Kick Members, Ban Members, Moderate Members, and **View Audit Log**.
+- Do not grant Administrator. Manage Roles is not required.
+- Keep the bot role below server owner/admin roles and above only the member roles it is intended to moderate.
 - Set `DISCORD_TOKEN` and `BOT_DATA_DIR` in the host environment. Never commit a token. `BOT_DATA_DIR` must be persistent and writable.
 - Set the startup directory to `bots/sukuna-admin`, then run `npm install`, `npm run check`, `npm test`, and `npm start`.
 
@@ -30,16 +36,25 @@ Independent Discord bot for moderation, warnings, moderation logs, configurable 
 - `s automod action alert|delete`
 - `s automod block add|remove phrase`
 - `s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT`
+- `s automod ignore channel add|remove #channel`
+- `s automod ignore role add|remove @role`
 - `s raid on|off|status`
 - `s raid limit 10`
+- `s security status`
+- `s security account-age on|off`
+- `s security account-age-days 7`
 
-Moderation actions require their matching Discord permission. Configuration, warning deletion, and warning clearing require Manage Server. Warning records include target ID, moderator ID, reason, timestamp, and unique record ID and persist independently of member presence.
+Moderation actions require their matching Discord permission. Configuration, warning deletion, and warning clearing require Manage Server. Warnings store target ID, moderator ID, reason, timestamp, and unique record ID, and remain available after a member leaves.
 
-## Safety defaults
-Automod and raid detection are **off by default**. Automod is configurable per guild and can alert or delete; it does not automatically timeout or ban. Raid protection only detects a configurable join-rate threshold and alerts through the moderation log; it never automatically locks channels, kicks, or bans. Tune thresholds for the server before enabling. Exempt channels/roles can be added through persisted config by an administrator; command UI for those exemptions is not included yet.
+## Security behavior
+- **Automod:** per-user message-rate, repeated-message, mass-mention (including @everyone/@here), and configured phrase detection. Channel/role exemptions are configurable. Alert/delete action is configurable.
+- **Raid detection:** alerts when a configurable number of members join within a time window. No lock-down, kick, or ban is automated.
+- **New-account alerts:** optionally alert when a joining account is younger than the configured age threshold. This is only a signal for staff review.
+- **Audit-log anomaly alerts:** monitors recorded member kicks/bans and alerts when the executor lacks the matching Discord permission. This is not a complete role-authorization policy engine; it does not prove intent and does not undo actions.
+- **Logging:** console logs always; optional configured Discord moderation-log channel. The bot must be able to view and send embeds in that channel.
 
 ## Storage and reliability
-JSON storage is intended for one running process per data directory. Writes are serialized, written to unique temporary files, synced, and atomically renamed. Keep backups. Do not run multiple replicas against the same JSON file. If the database is invalid, the original is moved to a timestamped corrupt backup before a fresh file is created.
+JSON storage is for one running process per data directory. Writes are serialized and written to unique temporary files, synced, then atomically renamed. Back up the data directory. Do not run multiple replicas against the same JSON file. Invalid JSON or an unsupported database version is moved to a timestamped `.corrupt-*` backup before a new empty database is created. Other filesystem errors stop startup rather than silently replacing data.
 
 ## Verification
-Run `npm run check` and `npm test`. Tests use temporary directories and do not require a Discord token. Live Discord permissions, host persistence, and moderation behavior still require a controlled test server.
+Run `npm run check` and `npm test`. Tests use temporary directories and do not require a Discord token. Automated tests cannot verify Discord role hierarchy, live intents, host persistence, or actual moderation permissions; validate those in a private test server before enabling enforcement.
