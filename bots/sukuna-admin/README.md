@@ -27,9 +27,9 @@ Automod, raid detection, and account-age alerts are OFF by default. Automod can 
 - `s timeout @member 10m [reason]` (1 second–28 days)
 - `s untimeout @member [reason]`
 - `s warn @member [reason]`
-- `s warnings USER_ID` (works even if the member has left)
-- `s removewarn USER_ID WARNING_NUMBER`
-- `s clearwarnings USER_ID`
+- `s warnings @member` (active warnings only; use a Discord ID if they have left)
+- `s warninghistory @member` (all active and archived warnings; Discord ID also supported)\n- `s removewarn @member WARNING_NUMBER` (archives the warning; Discord ID also supported)
+- `s clearwarnings @member` (archives active warnings and resets active numbering; Discord ID also supported)
 - `s setmodlog #channel`
 - `s disablemodlog`
 - `s automod on|off|status`
@@ -44,7 +44,7 @@ Automod, raid detection, and account-age alerts are OFF by default. Automod can 
 - `s security account-age on|off`
 - `s security account-age-days 7`
 
-Moderation actions require their matching Discord permission. Configuration, warning deletion, and warning clearing require Manage Server. Warnings store target ID, moderator ID, reason, timestamp, and a hidden unique record ID, and remain available after a member leaves. Warning lists show simple per-member numbers (Warning #1, #2, etc.). Numbers remain stable when other warnings are removed; use the number shown with `s removewarn USER_ID WARNING_NUMBER`.
+Moderation actions require their matching Discord permission. Configuration, warning deletion, and warning clearing require Manage Server. Warnings store target ID, moderator ID, reason, timestamp, and a hidden unique record ID, and remain available after a member leaves. Active warning numbers are per-member and restart at Warning #1 after `s clearwarnings`. Clearing or removing an active warning archives it instead of deleting it. `s warnings` shows active warnings; `s warninghistory` shows active and archived records, including reasons, moderators, dates, and whether each record is active, cleared, or removed. Mentions are supported; Discord IDs remain available for members who have left.
 
 ## Security behavior
 - **Automod:** per-user message-rate, repeated-message, mass-mention (including @everyone/@here), optional Discord invite-link filtering, and configured phrase detection. Channel/role exemptions are configurable. Alert/delete action is configurable.
