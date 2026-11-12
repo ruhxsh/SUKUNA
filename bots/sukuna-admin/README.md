@@ -47,7 +47,7 @@ Automod, raid detection, and account-age alerts are OFF by default. Automod can 
 Moderation actions require their matching Discord permission. Configuration, warning deletion, and warning clearing require Manage Server. Warnings store target ID, moderator ID, reason, timestamp, and unique record ID, and remain available after a member leaves.
 
 ## Security behavior
-- **Automod:** per-user message-rate, repeated-message, mass-mention (including @everyone/@here), and configured phrase detection. Channel/role exemptions are configurable. Alert/delete action is configurable.
+- **Automod:** per-user message-rate, repeated-message, mass-mention (including @everyone/@here), optional Discord invite-link filtering, and configured phrase detection. Channel/role exemptions are configurable. Alert/delete action is configurable.
 - **Raid detection:** alerts when a configurable number of members join within a time window. No lock-down, kick, or ban is automated.
 - **New-account alerts:** optionally alert when a joining account is younger than the configured age threshold. This is only a signal for staff review.
 - **Audit-log anomaly alerts:** monitors recorded member kicks/bans and alerts when the executor lacks the matching Discord permission. This is not a complete role-authorization policy engine; it does not prove intent and does not undo actions.
