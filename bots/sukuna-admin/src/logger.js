@@ -2,12 +2,12 @@ import { EmbedBuilder } from "discord.js";
 
 export async function logModeration(client, store, guild, details) {
   const entry = {
-    action: details.action || "unknown",
-    targetId: details.targetId || "N/A",
-    moderatorId: details.moderatorId || "N/A",
-    reason: details.reason || "No reason supplied",
-    duration: details.duration || "N/A",
-    result: details.result || "unknown",
+    action: String(details.action || "unknown").slice(0, 80),
+    targetId: String(details.targetId || "N/A"),
+    moderatorId: String(details.moderatorId || "N/A"),
+    reason: String(details.reason || "No reason supplied").slice(0, 1000),
+    duration: String(details.duration || "N/A").slice(0, 80),
+    result: String(details.result || "unknown"),
     timestamp: new Date().toISOString()
   };
   console.log("[MODERATION]", JSON.stringify({ guildId: guild?.id, ...entry }));
@@ -17,8 +17,7 @@ export async function logModeration(client, store, guild, details) {
   try {
     const channel = await guild.channels.fetch(channelId);
     if (!channel?.isTextBased() || !channel.send) return;
-    const embed = new EmbedBuilder()
-      .setTitle("Moderation: " + entry.action)
+    const embed = new EmbedBuilder().setTitle("Moderation: " + entry.action)
       .setColor(entry.result === "success" ? 0x2ecc71 : 0xe74c3c)
       .addFields(
         { name: "Target", value: entry.targetId, inline: true },
@@ -28,7 +27,7 @@ export async function logModeration(client, store, guild, details) {
         { name: "Duration", value: entry.duration, inline: true },
         { name: "Time (UTC)", value: entry.timestamp, inline: true }
       );
-    await channel.send({ embeds: [embed] });
+    await channel.send({ embeds: [embed], allowedMentions: { parse: [] } });
   } catch (error) {
     console.error("Could not send moderation log:", error.message);
   }
