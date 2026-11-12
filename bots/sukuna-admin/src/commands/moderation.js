@@ -49,7 +49,7 @@ export async function handleModerationCommand(message, args, store) {
     await message.reply("**SUKUNA — Administration & Security**\n" +
       "s kick @member [reason]\ns ban @member [reason]\ns unban USER_ID [reason]\n" +
       "s timeout @member 10m [reason]\ns untimeout @member [reason]\ns warn @member [reason]\n" +
-      "s warnings USER_ID\ns removewarn USER_ID WARNING_ID\ns clearwarnings USER_ID\n" +
+      "s warnings USER_ID\ns removewarn USER_ID WARNING_NUMBER\ns clearwarnings USER_ID\n" +
       "s setmodlog #channel\ns disablemodlog\ns automod on|off|status\n" +
       "s automod block add|remove \"phrase\"\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\ns raid on|off|status\ns raid limit 10\ns security status\ns security account-age on|off\ns security account-age-days 7");
     return;
@@ -180,7 +180,7 @@ export async function handleModerationCommand(message, args, store) {
       const records = store.getWarnings(guild.id, targetId);
       if (!records.length) return void await message.reply("That user has no warnings on record.");
       const embed = new EmbedBuilder().setTitle("Warnings for " + targetId).setDescription(records.slice(0, 12).map(w =>
-        "ID: " + w.id + "\nReason: " + w.reason + "\nModerator: <@" + w.moderatorId + ">\nDate: " + w.createdAt
+        "**Warning #" + (records.indexOf(w) + 1) + "**\nReason: " + w.reason + "\nModerator: <@" + w.moderatorId + ">\nDate: " + w.createdAt
       ).join("\n\n").slice(0, 4000));
       return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
@@ -194,13 +194,16 @@ export async function handleModerationCommand(message, args, store) {
         return void await message.reply("Could not clear warnings because storage failed. No change was kept.");
       }
     }
-    const warningId = args[1];
-    if (!warningId) return void await message.reply("Usage: s removewarn USER_ID WARNING_ID.");
+    const warningNumber = Number(args[1]);
+    if (!Number.isInteger(warningNumber) || warningNumber < 1) return void await message.reply("Usage: s removewarn USER_ID WARNING_NUMBER. Example: s removewarn 123456789012345678 2.");
+    const currentWarnings = store.getWarnings(guild.id, targetId);
+    const selectedWarning = currentWarnings[warningNumber - 1];
+    if (!selectedWarning) return void await message.reply("That warning number does not exist for this member. Use s warnings USER_ID to see the current numbers.");
     try {
-      const removed = await store.removeWarning(guild.id, targetId, warningId);
-      if (!removed) return void await message.reply("Warning record not found for that user.");
-      await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Removed warning " + warningId, result: "success" });
-      return void await message.reply("Removed warning " + warningId + ".");
+      const removed = await store.removeWarning(guild.id, targetId, selectedWarning.id);
+      if (!removed) return void await message.reply("That warning could not be found. Check the list again.");
+      await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Removed warning #" + warningNumber, result: "success" });
+      return void await message.reply("Removed Warning #" + warningNumber + " for <@" + targetId + ">.");
     } catch (error) {
       await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Could not persist warning removal: " + error.message, result: "failed" });
       return void await message.reply("Could not remove that warning because storage failed. No change was kept.");
@@ -220,7 +223,9 @@ export async function handleModerationCommand(message, args, store) {
     try {
       const record = await store.addWarning({ guildId: guild.id, targetId, moderatorId: message.author.id, reason });
       await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason, result: "success" });
-      return void await message.reply("Warning recorded for <@" + targetId + ">. Record ID: " + record.id);
+      const numberedWarnings = store.getWarnings(guild.id, targetId);
+      const warningNumber = numberedWarnings.findIndex(item => item.id === record.id) + 1;
+      return void await message.reply("Warning #" + warningNumber + " recorded for <@" + targetId + ">.");
     } catch (error) {
       await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Could not persist warning: " + error.message, result: "failed" });
       return void await message.reply("Could not save that warning because storage failed. No warning was kept.");
