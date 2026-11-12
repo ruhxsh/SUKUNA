@@ -2,7 +2,7 @@ import { Client, GatewayIntentBits } from "discord.js";
 import { PREFIX, getDataFilePath } from "./src/config.js";
 import { JsonStore } from "./src/store.js";
 import { handleModerationCommand } from "./src/commands/moderation.js";
-import { handleAutomodMessage, handleRaidJoin } from "./src/security.js";
+import { handleAutomodMessage, handleRaidJoin, handleAuditLogEntry } from "./src/security.js";
 
 const token = process.env.DISCORD_TOKEN;
 if (!token) {
@@ -11,7 +11,13 @@ if (!token) {
 }
 
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent]
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildModeration,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent
+  ]
 });
 const store = await new JsonStore(getDataFilePath()).init();
 
@@ -40,7 +46,12 @@ client.on("messageCreate", async message => {
 
 client.on("guildMemberAdd", async member => {
   try { await handleRaidJoin(member, store); }
-  catch (error) { console.error("Raid detection failed:", error); }
+  catch (error) { console.error("Join security check failed:", error); }
+});
+
+client.on("guildAuditLogEntryCreate", async (entry, guild) => {
+  try { await handleAuditLogEntry(entry, guild, store, client); }
+  catch (error) { console.error("Audit-log security check failed:", error); }
 });
 
 client.on("error", error => console.error("Discord client error:", error));
