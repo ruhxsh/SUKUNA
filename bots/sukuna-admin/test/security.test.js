@@ -62,6 +62,16 @@ test("automod alerts without deleting when alert mode is selected", async () => 
   assert.equal(second.wasDeleted(), false);
 });
 
+test("automod blocks Discord invite links only when enabled", async () => {
+  resetSecurityMemoryForTests();
+  const base = makeStore();
+  const config = base.getConfig(guildId);
+  config.automod.blockInvites = true;
+  const message = makeMessage({ content: "join us at discord.gg/example" });
+  await handleAutomodMessage(message, { getConfig: () => config });
+  assert.equal(message.wasDeleted(), true);
+});
+
 test("automod ignores bots and configured channels and roles", async () => {
   resetSecurityMemoryForTests();
   const store = makeStore({ automod: {
