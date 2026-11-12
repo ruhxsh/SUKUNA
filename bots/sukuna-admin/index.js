@@ -29,7 +29,7 @@ client.once("ready", readyClient => {
 client.on("messageCreate", async message => {
   if (!message.guild || message.author.bot) return;
   try {
-    await handleAutomodMessage(message, store);
+    if (await handleAutomodMessage(message, store)) return;
     const content = message.content.trim();
     if (content.slice(0, PREFIX.length).toLowerCase() !== PREFIX) return;
     if (content.length > PREFIX.length && !/\s/.test(content[PREFIX.length])) return;
