@@ -29,10 +29,10 @@ function makeStore(overrides = {}) {
   };
   return { getConfig: () => structuredClone(config) };
 }
-function makeMessage({content="hello", authorId="22345678901234567", bot=false, roles=[], everyone=false, users=0, roleMentions=0}={}) {
+function makeMessage({content="hello", authorId="22345678901234567", bot=false, roles=[], everyone=false, users=0, roleMentions=0, channelId="32345678901234567"}={}) {
   let deleted = false;
   const message = {
-    guild: { id: guildId }, guildId, channelId: "32345678901234567",
+    guild: { id: guildId }, guildId, channelId,
     author: { id: authorId, bot }, webhookId: null, content,
     member: { roles: { cache: { some: fn => roles.some(fn) } } },
     mentions: { everyone, users: { size: users }, roles: { size: roleMentions } },
@@ -117,7 +117,7 @@ test("raid and account-age checks are opt-in and alert without punishment", asyn
     config.security.raidJoinLimit = 2;
     await handleRaidJoin(member, ageStore);
     await handleRaidJoin(member, ageStore);
-    assert.equal(logs, 3);
+    assert.equal(logs, 4);
   } finally {
     console.log = original;
   }
