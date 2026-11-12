@@ -1,7 +1,7 @@
 import { EmbedBuilder } from "discord.js";
 
 async function actorLabel(guild, id) {
-  if (!/^\\d{17,20}$/.test(String(id || ""))) return "Unknown member";
+  if (!/^\d{17,20}$/.test(String(id || ""))) return "Unknown member";
   const member = await guild.members.fetch(id).catch(() => null);
   if (member) return member.displayName + " (<@" + id + ">)";
   const user = await guild.client.users.fetch(id).catch(() => null);
