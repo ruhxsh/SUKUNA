@@ -67,7 +67,28 @@ function normalizeState(value) {
       let nextNumber = Math.max(0, ...memberWarnings.map(w => w.number));
       for (const warning of memberWarnings) if (warning.number === 0) warning.number = ++nextNumber;
     }
-    state.guilds[guildId] = { config: normalizeConfig(guild.config), warnings };
+    const warningHistory = Array.isArray(guild.warningHistory) ? guild.warningHistory.filter(w =>
+      isObject(w) && typeof w.id === "string" &&
+      snowflake(w.targetId) && snowflake(w.moderatorId) &&
+      typeof w.reason === "string" && typeof w.createdAt === "string" &&
+      !Number.isNaN(Date.parse(w.createdAt))
+    ).map(w => ({
+      id: w.id.slice(0, 80), number: Number.isSafeInteger(w.number) && w.number > 0 ? w.number : 0,
+      targetId: w.targetId, moderatorId: w.moderatorId,
+      reason: w.reason.slice(0, 500), createdAt: w.createdAt,
+      status: w.status === "removed" ? "removed" : "cleared"
+    })) : [];
+    const allByTarget = new Map();
+    for (const warning of [...warnings, ...warningHistory]) {
+      if (!allByTarget.has(warning.targetId)) allByTarget.set(warning.targetId, []);
+      allByTarget.get(warning.targetId).push(warning);
+    }
+    for (const memberWarnings of allByTarget.values()) {
+      memberWarnings.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      let nextNumber = Math.max(0, ...memberWarnings.map(w => w.number));
+      for (const warning of memberWarnings) if (warning.number === 0) warning.number = ++nextNumber;
+    }
+    state.guilds[guildId] = { config: normalizeConfig(guild.config), warnings, warningHistory };
   }
   return state;
 }
@@ -109,7 +130,7 @@ export class JsonStore {
   }
 
   getGuild(guildId) {
-    if (!this.state.guilds[guildId]) this.state.guilds[guildId] = { config: structuredClone(DEFAULT_CONFIG), warnings: [] };
+    if (!this.state.guilds[guildId]) this.state.guilds[guildId] = { config: structuredClone(DEFAULT_CONFIG), warnings: [], warningHistory: [] };
     return this.state.guilds[guildId];
   }
 
@@ -146,26 +167,43 @@ export class JsonStore {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(w => ({ ...w }));
   }
 
+  getWarningHistory(guildId, targetId) {
+    const guild = this.getGuild(guildId);
+    return [...guild.warningHistory, ...guild.warnings]
+      .filter(w => w.targetId === targetId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(w => ({ ...w, status: w.status || "active" }));
+  }
+
   async removeWarning(guildId, targetId, warningNumber) {
     return this.runMutation(async () => {
-      const records = this.getGuild(guildId).warnings;
-      const index = records.findIndex(w => w.targetId === targetId && w.number === Number(warningNumber));
+      const guild = this.getGuild(guildId);
+      const index = guild.warnings.findIndex(w => w.targetId === targetId && w.number === Number(warningNumber));
       if (index < 0) return null;
-      const [removed] = records.splice(index, 1);
+      const [removed] = guild.warnings.splice(index, 1);
+      const archived = { ...removed, status: "removed" };
+      guild.warningHistory.push(archived);
       try { await this.persist(); }
-      catch (error) { records.splice(index, 0, removed); throw error; }
-      return { ...removed };
+      catch (error) { guild.warningHistory.pop(); guild.warnings.splice(index, 0, removed); throw error; }
+      return { ...archived };
     });
   }
 
   async clearWarnings(guildId, targetId) {
     return this.runMutation(async () => {
       const guild = this.getGuild(guildId);
-      const previous = guild.warnings;
-      guild.warnings = previous.filter(w => w.targetId !== targetId);
+      const removed = guild.warnings.filter(w => w.targetId === targetId);
+      if (!removed.length) return 0;
+      const previousHistoryLength = guild.warningHistory.length;
+      guild.warnings = guild.warnings.filter(w => w.targetId !== targetId);
+      guild.warningHistory.push(...removed.map(w => ({ ...w, status: "cleared" })));
       try { await this.persist(); }
-      catch (error) { guild.warnings = previous; throw error; }
-      return previous.length - guild.warnings.length;
+      catch (error) {
+        guild.warningHistory.splice(previousHistoryLength);
+        guild.warnings.push(...removed);
+        throw error;
+      }
+      return removed.length;
     });
   }
 
