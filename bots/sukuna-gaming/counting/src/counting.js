@@ -1,5 +1,5 @@
 const NUMBER_LIKE_PATTERN = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/;
-const INTEGER_PATTERN = /^(0|[1-9]\d{0,99})$/;
+const INTEGER_PATTERN = /^\d{1,100}$/;
 const PREFIX_PATTERN = /^s(?:\s+([\s\S]*))?$/i;
 
 function safeReply(message, content) {
