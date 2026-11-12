@@ -1,0 +1,18 @@
+{
+  "name": "sukuna-gaming-counting",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone counting system for SUKUNA GAMING",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "test": "node --test",
+    "check": "node --check src/index.js && node --check src/counting.js && node --check src/store.js && node --check scripts/migrate-legacy-data.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.27.0"
+  }
+}
