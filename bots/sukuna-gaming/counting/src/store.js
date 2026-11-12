@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 
 const DATA_VERSION = 1;
 const SNOWFLAKE_PATTERN = /^\d{17,20}$/;
-const COUNT_PATTERN = /^(0|[1-9]\d{0,99})$/;
+const COUNT_PATTERN = /^\d{1,100}$/;
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -20,7 +20,7 @@ function normalizeCount(value, fallback = "0") {
   }
 
   if (typeof value === "string" && COUNT_PATTERN.test(value)) {
-    return value;
+    return BigInt(value).toString();
   }
 
   return fallback;
