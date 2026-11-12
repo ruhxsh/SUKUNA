@@ -22,9 +22,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: bots/sukuna-admin/package-lock.json
-      - run: npm install --package-lock-only --ignore-scripts
       - run: npm install --ignore-scripts
       - run: npm run check
       - run: npm test
