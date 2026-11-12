@@ -71,10 +71,14 @@ export async function handleModerationCommand(message, args, store) {
   if (command === "automod") {
     const [sub, ...rest] = args;
     const current = store.getConfig(guild.id).automod;
-    if (sub === "status") return void await message.reply("Automod: " + (current.enabled ? "ON" : "OFF") + " | action: " + current.action + " | rate: " + current.maxMessages + "/" + current.intervalMs + "ms | duplicates: " + current.duplicateLimit + " | mention limit: " + current.massMentionLimit + " | blocked phrases: " + current.blockedPhrases.length);
+    if (sub === "status") return void await message.reply("Automod: " + (current.enabled ? "ON" : "OFF") + " | action: " + current.action + " | rate: " + current.maxMessages + "/" + current.intervalMs + "ms | duplicates: " + current.duplicateLimit + " | mention limit: " + current.massMentionLimit + " | blocked phrases: " + current.blockedPhrases.length + " | invite links: " + (current.blockInvites ? "blocked" : "allowed"));
     if (sub === "on" || sub === "off") {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, enabled: sub === "on" } }));
       return void await message.reply("Automod is now " + sub.toUpperCase() + ". Review settings with s automod status.");
+    }
+    if (sub === "invites" && ["on", "off"].includes(rest[0])) {
+      await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, blockInvites: rest[0] === "on" } }));
+      return void await message.reply("Discord invite-link filtering is now " + rest[0].toUpperCase() + ".");
     }
     if (sub === "block" && ["add", "remove"].includes(rest[0])) {
       const phrase = rest.slice(1).join(" ").trim().slice(0, 100);
@@ -111,7 +115,7 @@ export async function handleModerationCommand(message, args, store) {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, maxMessages: rate, intervalMs: interval, duplicateLimit: duplicates, massMentionLimit: mentions } }));
       return void await message.reply("Automod thresholds updated.");
     }
-    return void await message.reply("Use s automod on|off|status, s automod action alert|delete, s automod block add|remove phrase, or s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT.");
+    return void await message.reply("Use s automod on|off|status, s automod action alert|delete, s automod invites on|off, s automod block add|remove phrase, s automod ignore channel|role add|remove, or s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT.");
   }
 
   if (command === "raid") {
