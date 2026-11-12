@@ -124,6 +124,12 @@ export async function handleModerationCommand(message, args, store) {
   }
 
   if (command === "warn") {
+    if (target.id === message.author.id || target.id === guild.ownerId ||
+        (message.author.id !== guild.ownerId &&
+         member.roles.highest.comparePositionTo(target.roles.highest) <= 0)) {
+      await message.reply("You cannot warn yourself, the server owner, or a member with an equal or higher role.");
+      return;
+    }
     const reason = reasonFrom(args);
     const record = await store.addWarning({
       guildId: guild.id, targetId: target.id, moderatorId: message.author.id, reason
