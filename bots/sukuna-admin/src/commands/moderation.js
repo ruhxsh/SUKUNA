@@ -35,7 +35,7 @@ export async function handleModerationCommand(message, args, store) {
 
   const permission = command === "kick" ? PermissionFlagsBits.KickMembers
     : ["ban", "unban"].includes(command) ? PermissionFlagsBits.BanMembers
-    : ["timeout", "untimeout", "warn", "warnings"].includes(command) ? PermissionFlagsBits.ModerateMembers
+    : ["timeout", "untimeout", "warn", "warnings", "warninghistory"].includes(command) ? PermissionFlagsBits.ModerateMembers
     : ["setmodlog", "disablemodlog", "clearwarnings", "removewarn", "automod", "raid", "security"].includes(command) ? PermissionFlagsBits.ManageGuild
     : null;
 
@@ -49,7 +49,7 @@ export async function handleModerationCommand(message, args, store) {
     await message.reply("**SUKUNA — Administration & Security**\n" +
       "s kick @member [reason]\ns ban @member [reason]\ns unban USER_ID [reason]\n" +
       "s timeout @member 10m [reason]\ns untimeout @member [reason]\ns warn @member [reason]\n" +
-      "s warnings USER_ID\ns removewarn USER_ID WARNING_NUMBER\ns clearwarnings USER_ID\n" +
+      "s warnings @member\ns warninghistory @member\ns removewarn @member WARNING_NUMBER\ns clearwarnings @member\n" +
       "s setmodlog #channel\ns disablemodlog\ns automod on|off|status\n" +
       "s automod block add|remove \"phrase\"\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\ns raid on|off|status\ns raid limit 10\ns security status\ns security account-age on|off\ns security account-age-days 7");
     return;
@@ -168,42 +168,46 @@ export async function handleModerationCommand(message, args, store) {
     return;
   }
 
-  const known = ["kick", "ban", "timeout", "untimeout", "warn", "warnings", "removewarn", "clearwarnings"];
+  const known = ["kick", "ban", "timeout", "untimeout", "warn", "warnings", "warninghistory", "removewarn", "clearwarnings"];
   if (!known.includes(command)) return void await message.reply("Unknown command. Use s help.");
 
   const targetToken = args[0];
   const mentionId = /^<@!?(\d{17,20})>$/.exec(targetToken || "")?.[1];
   const targetId = mentionId || targetToken;
-  if (!isSnowflake(targetId)) return void await message.reply("Target not found. Mention a member or provide their Discord ID.");
-  if (["warnings", "removewarn", "clearwarnings"].includes(command)) {
-    if (command === "warnings") {
-      const records = store.getWarnings(guild.id, targetId);
-      if (!records.length) return void await message.reply("That user has no warnings on record.");
-      const embed = new EmbedBuilder().setTitle("Warnings for " + targetId).setDescription(records.slice(0, 12).map(w =>
-        "**Warning #" + w.number + "**\nReason: " + w.reason + "\nModerator: <@" + w.moderatorId + ">\nDate: " + w.createdAt
-      ).join("\n\n").slice(0, 4000));
+  if (!isSnowflake(targetId)) return void await message.reply("Target not found. Mention a member, or use their Discord ID if they have left the server.");
+  if (["warnings", "warninghistory", "removewarn", "clearwarnings"].includes(command)) {
+    if (command === "warnings" || command === "warninghistory") {
+      const records = command === "warnings"
+        ? store.getWarnings(guild.id, targetId).map(w => ({ ...w, status: "active" }))
+        : store.getWarningHistory(guild.id, targetId);
+      if (!records.length) return void await message.reply(command === "warnings" ? "That member has no active warnings." : "That member has no warning history.");
+      const embed = new EmbedBuilder()
+        .setTitle((command === "warnings" ? "Active warnings for " : "Warning history for ") + targetId)
+        .setDescription(records.slice(0, 12).map(w =>
+          "**Warning #" + w.number + " — " + (w.status === "active" ? "ACTIVE" : w.status.toUpperCase()) + "**\nReason: " + w.reason + "\nModerator: <@" + w.moderatorId + ">\nDate: " + w.createdAt
+        ).join("\n\n").slice(0, 4000));
       return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
     if (command === "clearwarnings") {
       try {
         const count = await store.clearWarnings(guild.id, targetId);
-        await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Cleared " + count + " warning(s)", result: "success" });
-        return void await message.reply("Cleared " + count + " warning(s) for " + targetId + ".");
+        await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Archived and cleared " + count + " active warning(s)", result: "success" });
+        return void await message.reply("Cleared " + count + " active warning(s) for <@" + targetId + ">. Their history was preserved.");
       } catch (error) {
         await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Could not persist warning cleanup: " + error.message, result: "failed" });
         return void await message.reply("Could not clear warnings because storage failed. No change was kept.");
       }
     }
     const warningNumber = Number(args[1]);
-    if (!Number.isInteger(warningNumber) || warningNumber < 1) return void await message.reply("Usage: s removewarn USER_ID WARNING_NUMBER. Example: s removewarn 123456789012345678 2.");
+    if (!Number.isInteger(warningNumber) || warningNumber < 1) return void await message.reply("Usage: s removewarn @member WARNING_NUMBER. Example: s removewarn @member 2.");
     const currentWarnings = store.getWarnings(guild.id, targetId);
     const selectedWarning = currentWarnings.find(w => w.number === warningNumber);
-    if (!selectedWarning) return void await message.reply("That warning number does not exist for this member. Use s warnings USER_ID to see the current numbers.");
+    if (!selectedWarning) return void await message.reply("That active warning number does not exist. Use s warnings @member to see active warning numbers.");
     try {
       const removed = await store.removeWarning(guild.id, targetId, warningNumber);
-      if (!removed) return void await message.reply("That warning could not be found. Check the list again.");
+      if (!removed) return void await message.reply("That active warning could not be found. Check s warnings @member again.");
       await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Removed warning #" + warningNumber, result: "success" });
-      return void await message.reply("Removed Warning #" + warningNumber + " for <@" + targetId + ">.");
+      return void await message.reply("Removed Warning #" + warningNumber + " from <@" + targetId + ">'s active warnings. Its history was preserved.");
     } catch (error) {
       await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason: "Could not persist warning removal: " + error.message, result: "failed" });
       return void await message.reply("Could not remove that warning because storage failed. No change was kept.");
@@ -211,7 +215,7 @@ export async function handleModerationCommand(message, args, store) {
   }
 
   const target = await guild.members.fetch(targetId).catch(() => null);
-  if (!target) return void await message.reply("That member is not currently in this server. Warning history can still be viewed by ID.");
+  if (!target) return void await message.reply("That member is not currently in this server. You can still view their warnings or history by Discord ID.");
   const reason = reasonFrom(args, command === "timeout" ? 2 : 1);
   if (command === "warn") {
     const roleError = target.id === message.author.id || target.id === guild.ownerId || (message.author.id !== guild.ownerId && member.roles.highest.comparePositionTo(target.roles.highest) <= 0);
@@ -223,7 +227,6 @@ export async function handleModerationCommand(message, args, store) {
     try {
       const record = await store.addWarning({ guildId: guild.id, targetId, moderatorId: message.author.id, reason });
       await logModeration(message.client, store, guild, { action: command, targetId, moderatorId: message.author.id, reason, result: "success" });
-      const numberedWarnings = store.getWarnings(guild.id, targetId);
       const warningNumber = record.number;
       return void await message.reply("Warning #" + warningNumber + " recorded for <@" + targetId + ">.");
     } catch (error) {
