@@ -5,23 +5,22 @@ import os from "node:os";
 import path from "node:path";
 import { JsonStore } from "../src/store.js";
 
-test("warnings persist and can be removed independently", async () => {
+const ids = { guildId: "12345678901234567", targetId: "22345678901234567", moderatorId: "32345678901234567" };
+
+test("warnings persist, retain identity fields, and can be removed independently", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
   const file = path.join(directory, "store.json");
   try {
     const store = await new JsonStore(file).init();
-    const warning = await store.addWarning({
-      guildId: "12345678901234567", targetId: "22345678901234567",
-      moderatorId: "32345678901234567", reason: "Test warning"
-    });
+    const warning = await store.addWarning({ ...ids, reason: "Test warning" });
     const reloaded = await new JsonStore(file).init();
-    assert.equal(reloaded.getWarnings("12345678901234567", "22345678901234567").length, 1);
-    assert.equal(reloaded.getWarnings("12345678901234567", "22345678901234567")[0].id, warning.id);
-    assert.ok(await reloaded.removeWarning("12345678901234567", "22345678901234567", warning.id));
-    assert.equal(reloaded.getWarnings("12345678901234567", "22345678901234567").length, 0);
-  } finally {
-    await fs.rm(directory, { recursive: true, force: true });
-  }
+    const records = reloaded.getWarnings(ids.guildId, ids.targetId);
+    assert.equal(records.length, 1);
+    assert.equal(records[0].id, warning.id);
+    assert.equal(records[0].moderatorId, ids.moderatorId);
+    assert.ok(await reloaded.removeWarning(ids.guildId, ids.targetId, warning.id));
+    assert.equal(reloaded.getWarnings(ids.guildId, ids.targetId).length, 0);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
 
 test("clearing warnings preserves other members' records", async () => {
@@ -29,12 +28,31 @@ test("clearing warnings preserves other members' records", async () => {
   const file = path.join(directory, "store.json");
   try {
     const store = await new JsonStore(file).init();
-    const guildId = "12345678901234567";
-    await store.addWarning({ guildId, targetId: "22345678901234567", moderatorId: "32345678901234567", reason: "A" });
-    await store.addWarning({ guildId, targetId: "42345678901234567", moderatorId: "32345678901234567", reason: "B" });
-    assert.equal(await store.clearWarnings(guildId, "22345678901234567"), 1);
-    assert.equal(store.getWarnings(guildId, "42345678901234567").length, 1);
-  } finally {
-    await fs.rm(directory, { recursive: true, force: true });
-  }
+    await store.addWarning({ ...ids, reason: "A" });
+    await store.addWarning({ ...ids, targetId: "42345678901234567", reason: "B" });
+    assert.equal(await store.clearWarnings(ids.guildId, ids.targetId), 1);
+    assert.equal(store.getWarnings(ids.guildId, "42345678901234567").length, 1);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test("concurrent writes preserve all warning records", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  const file = path.join(directory, "store.json");
+  try {
+    const store = await new JsonStore(file).init();
+    await Promise.all(Array.from({ length: 30 }, (_, i) => store.addWarning({ ...ids, reason: "R" + i })));
+    const reloaded = await new JsonStore(file).init();
+    assert.equal(reloaded.getWarnings(ids.guildId, ids.targetId).length, 30);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test("configuration is bounded and ignores invalid values", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  try {
+    const store = await new JsonStore(path.join(directory, "store.json")).init();
+    const config = await store.updateConfig(ids.guildId, c => ({ ...c, automod: { ...c.automod, maxMessages: 999, blockedPhrases: ["bad", "", 2] }, security: { ...c.security, raidJoinLimit: 1 } }));
+    assert.equal(config.automod.maxMessages, 30);
+    assert.deepEqual(config.automod.blockedPhrases, ["bad"]);
+    assert.equal(config.security.raidJoinLimit, 3);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
