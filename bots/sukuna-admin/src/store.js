@@ -106,11 +106,12 @@ export class JsonStore {
 
   async persist() {
     const snapshot = JSON.stringify(this.state, null, 2);
-    this.writeQueue = this.writeQueue.then(async () => {
+    const write = this.writeQueue.catch(() => {}).then(async () => {
       const tempPath = this.filePath + ".tmp";
       await fs.writeFile(tempPath, snapshot, { encoding: "utf8", mode: 0o600 });
       await fs.rename(tempPath, this.filePath);
     });
-    return this.writeQueue;
+    this.writeQueue = write;
+    return write;
   }
 }
