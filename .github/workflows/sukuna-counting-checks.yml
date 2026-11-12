@@ -1,0 +1,28 @@
+name: SUKUNA Counting Checks
+
+on:
+  push:
+    branches:
+      - rebuild/sukuna-counting
+    paths:
+      - "bots/sukuna-gaming/counting/**"
+      - ".github/workflows/sukuna-counting-checks.yml"
+  pull_request:
+    paths:
+      - "bots/sukuna-gaming/counting/**"
+      - ".github/workflows/sukuna-counting-checks.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bots/sukuna-gaming/counting
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --ignore-scripts
+      - run: npm run check
+      - run: npm test
