@@ -20,6 +20,7 @@ function normalizeConfig(input) {
     automod: {
       enabled: automod.enabled === true,
       action: ["alert", "delete"].includes(automod.action) ? automod.action : DEFAULT_CONFIG.automod.action,
+      blockInvites: automod.blockInvites === true,
       maxMessages: Number.isInteger(automod.maxMessages) ? Math.min(30, Math.max(3, automod.maxMessages)) : DEFAULT_CONFIG.automod.maxMessages,
       intervalMs: Number.isInteger(automod.intervalMs) ? Math.min(60000, Math.max(3000, automod.intervalMs)) : DEFAULT_CONFIG.automod.intervalMs,
       duplicateLimit: Number.isInteger(automod.duplicateLimit) ? Math.min(10, Math.max(2, automod.duplicateLimit)) : DEFAULT_CONFIG.automod.duplicateLimit,
