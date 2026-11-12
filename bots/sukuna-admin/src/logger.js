@@ -18,7 +18,7 @@ export async function logModeration(client, store, guild, details) {
     const channel = await guild.channels.fetch(channelId);
     if (!channel?.isTextBased() || !channel.send) return;
     const embed = new EmbedBuilder().setTitle("Moderation: " + entry.action)
-      .setColor(entry.result === "success" ? 0x2ecc71 : 0xe74c3c)
+      .setColor(entry.result === "success" ? 0x2ecc71 : entry.result === "alert" ? 0xf39c12 : 0xe74c3c)
       .addFields(
         { name: "Target", value: entry.targetId, inline: true },
         { name: "Moderator", value: entry.moderatorId, inline: true },
