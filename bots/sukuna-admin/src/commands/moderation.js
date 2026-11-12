@@ -189,11 +189,13 @@ export async function handleModerationCommand(message, args, store) {
         ? store.getWarnings(guild.id, targetId).map(w => ({ ...w, status: "active" }))
         : store.getWarningHistory(guild.id, targetId);
       if (!records.length) return void await message.reply(command === "warnings" ? "That member has no active warnings." : "That member has no warning history.");
+      const targetLabel = await getUserMention(guild, targetId);
+      const recordLines = await Promise.all(records.slice(0, 12).map(async w =>
+        "**Warning #" + w.number + " — " + (w.status === "active" ? "ACTIVE" : w.status.toUpperCase()) + "**\nReason: " + w.reason + "\nModerator: " + await getUserMention(guild, w.moderatorId) + "\nDate: " + w.createdAt
+      ));
       const embed = new EmbedBuilder()
-        .setTitle((command === "warnings" ? "Active warnings for " : "Warning history for ") + targetId)
-        .setDescription(records.slice(0, 12).map(w =>
-          "**Warning #" + w.number + " — " + (w.status === "active" ? "ACTIVE" : w.status.toUpperCase()) + "**\nReason: " + w.reason + "\nModerator: <@" + w.moderatorId + ">\nDate: " + w.createdAt
-        ).join("\n\n").slice(0, 4000));
+        .setTitle((command === "warnings" ? "Active warnings for " : "Warning history for ") + targetLabel)
+        .setDescription(recordLines.join("\n\n").slice(0, 4000));
       return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
     if (command === "clearwarnings") {
