@@ -62,6 +62,7 @@ export class JsonStore {
     this.filePath = filePath;
     this.state = emptyState();
     this.writeQueue = Promise.resolve();
+    this.mutationQueue = Promise.resolve();
   }
 
   async init() {
@@ -86,6 +87,12 @@ export class JsonStore {
     return this;
   }
 
+  runMutation(operation) {
+    const next = this.mutationQueue.catch(() => {}).then(operation);
+    this.mutationQueue = next;
+    return next;
+  }
+
   getGuild(guildId) {
     if (!this.state.guilds[guildId]) this.state.guilds[guildId] = { config: structuredClone(DEFAULT_CONFIG), warnings: [] };
     return this.state.guilds[guildId];
@@ -94,24 +101,28 @@ export class JsonStore {
   getConfig(guildId) { return structuredClone(this.getGuild(guildId).config); }
 
   async updateConfig(guildId, updater) {
-    const guild = this.getGuild(guildId);
-    const next = updater(structuredClone(guild.config));
-    if (!isObject(next)) throw new TypeError("Invalid configuration update.");
-    const previous = guild.config;
-    guild.config = normalizeConfig(next);
-    try { await this.persist(); }
-    catch (error) { guild.config = previous; throw error; }
-    return this.getConfig(guildId);
+    return this.runMutation(async () => {
+      const guild = this.getGuild(guildId);
+      const next = updater(structuredClone(guild.config));
+      if (!isObject(next)) throw new TypeError("Invalid configuration update.");
+      const previous = guild.config;
+      guild.config = normalizeConfig(next);
+      try { await this.persist(); }
+      catch (error) { guild.config = previous; throw error; }
+      return this.getConfig(guildId);
+    });
   }
 
   async addWarning({ guildId, targetId, moderatorId, reason }) {
-    if (!snowflake(guildId) || !snowflake(targetId) || !snowflake(moderatorId)) throw new TypeError("Invalid Discord ID.");
-    const record = { id: randomUUID(), targetId, moderatorId, reason: String(reason || "No reason supplied").slice(0, 500), createdAt: new Date().toISOString() };
-    const records = this.getGuild(guildId).warnings;
-    records.push(record);
-    try { await this.persist(); }
-    catch (error) { records.pop(); throw error; }
-    return { ...record };
+    return this.runMutation(async () => {
+      if (!snowflake(guildId) || !snowflake(targetId) || !snowflake(moderatorId)) throw new TypeError("Invalid Discord ID.");
+      const record = { id: randomUUID(), targetId, moderatorId, reason: String(reason || "No reason supplied").slice(0, 500), createdAt: new Date().toISOString() };
+      const records = this.getGuild(guildId).warnings;
+      records.push(record);
+      try { await this.persist(); }
+      catch (error) { records.splice(records.findIndex(item => item.id === record.id), 1); throw error; }
+      return { ...record };
+    });
   }
 
   getWarnings(guildId, targetId) {
@@ -120,22 +131,26 @@ export class JsonStore {
   }
 
   async removeWarning(guildId, targetId, warningId) {
-    const records = this.getGuild(guildId).warnings;
-    const index = records.findIndex(w => w.targetId === targetId && w.id === warningId);
-    if (index < 0) return null;
-    const [removed] = records.splice(index, 1);
-    try { await this.persist(); }
-    catch (error) { records.splice(index, 0, removed); throw error; }
-    return { ...removed };
+    return this.runMutation(async () => {
+      const records = this.getGuild(guildId).warnings;
+      const index = records.findIndex(w => w.targetId === targetId && w.id === warningId);
+      if (index < 0) return null;
+      const [removed] = records.splice(index, 1);
+      try { await this.persist(); }
+      catch (error) { records.splice(index, 0, removed); throw error; }
+      return { ...removed };
+    });
   }
 
   async clearWarnings(guildId, targetId) {
-    const guild = this.getGuild(guildId);
-    const previous = guild.warnings;
-    guild.warnings = previous.filter(w => w.targetId !== targetId);
-    try { await this.persist(); }
-    catch (error) { guild.warnings = previous; throw error; }
-    return previous.length - guild.warnings.length;
+    return this.runMutation(async () => {
+      const guild = this.getGuild(guildId);
+      const previous = guild.warnings;
+      guild.warnings = previous.filter(w => w.targetId !== targetId);
+      try { await this.persist(); }
+      catch (error) { guild.warnings = previous; throw error; }
+      return previous.length - guild.warnings.length;
+    });
   }
 
   async persist() {
