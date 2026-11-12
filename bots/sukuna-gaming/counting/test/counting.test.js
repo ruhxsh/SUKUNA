@@ -100,7 +100,7 @@ test("counts persist, enforce sequence and alternate members", async () => {
     const store = await new CountingStore(filePath).load();
     await store.setChannel(guildId, channelId);
 
-    assert.equal((await store.recordCount(guildId, "1", userA)).accepted, true);
+    assert.equal((await store.recordCount(guildId, "0001", userA)).accepted, true);
     assert.equal((await store.recordCount(guildId, "2", userA)).reason, "same-member");
     assert.equal((await store.recordCount(guildId, "3", userB)).reason, "wrong-number");
     assert.equal((await store.recordCount(guildId, "2", userB)).accepted, true);
