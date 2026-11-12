@@ -51,7 +51,7 @@ export async function handleModerationCommand(message, args, store) {
       "s timeout @member 10m [reason]\ns untimeout @member [reason]\ns warn @member [reason]\n" +
       "s warnings USER_ID\ns removewarn USER_ID WARNING_ID\ns clearwarnings USER_ID\n" +
       "s setmodlog #channel\ns disablemodlog\ns automod on|off|status\n" +
-      "s automod block add|remove \"phrase\"\ns automod ignore channel|role add|remove\ns raid on|off|status\ns raid limit 10\ns security status\ns security account-age on|off\ns security account-age-days 7");
+      "s automod block add|remove \"phrase\"\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\ns raid on|off|status\ns raid limit 10\ns security status\ns security account-age on|off\ns security account-age-days 7");
     return;
   }
 
