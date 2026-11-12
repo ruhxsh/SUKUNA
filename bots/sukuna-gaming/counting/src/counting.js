@@ -41,7 +41,7 @@ export async function handleCountingSetup(message, store, disable = false) {
   }
 
   const botMember = message.guild.members?.me;
-  const permissions = channel.permissionsFor(botMember);
+  const permissions = botMember ? channel.permissionsFor(botMember) : null;
   const missing = ["ViewChannel", "SendMessages", "AddReactions", "ManageMessages"]
     .filter((permission) => !hasPermission(permissions, permission));
 
@@ -73,7 +73,7 @@ export async function handleCountingMessage(message, store, logger = console) {
   if (!state.channelId || state.channelId !== channelId) return false;
 
   const botMember = message.guild.members?.me;
-  const permissions = message.channel.permissionsFor?.(botMember);
+  const permissions = botMember ? message.channel.permissionsFor?.(botMember) : null;
   const canReact = hasPermission(permissions, "AddReactions");
   const canDelete = hasPermission(permissions, "ManageMessages");
 
