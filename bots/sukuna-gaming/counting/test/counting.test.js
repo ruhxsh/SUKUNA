@@ -141,7 +141,7 @@ test("count handler accepts valid numbers and removes invalid numeric entries", 
     const store = await new CountingStore(join(directory, "counting-data.json")).load();
     await store.setChannel(guildId, channelId);
 
-    const first = makeMessage({ content: "1", authorId: userA });
+    const first = makeMessage({ content: "0001", authorId: userA });
     const sameMember = makeMessage({ content: "2", authorId: userA });
     const decimal = makeMessage({ content: "2.5", authorId: userB });
     const second = makeMessage({ content: "2", authorId: userB });
