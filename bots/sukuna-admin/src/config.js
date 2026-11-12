@@ -20,8 +20,9 @@ export const DEFAULT_CONFIG = Object.freeze({
     raidProtectionEnabled: false,
     raidJoinLimit: 10,
     raidWindowMs: 15000,
-    raidAction: "alert",
-    alertCooldownMs: 60000
+    alertCooldownMs: 60000,
+    accountAgeAlertsEnabled: false,
+    minimumAccountAgeDays: 7
   }
 });
 export function getDataFilePath() {
