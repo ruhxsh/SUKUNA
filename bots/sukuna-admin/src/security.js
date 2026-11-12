@@ -37,7 +37,7 @@ export async function handleAutomodMessage(message, store) {
   if (state.times.length > rules.maxMessages) violation = "Message rate exceeded configured limit";
   else if (normalized && state.recent.filter(item => item.content === normalized).length >= rules.duplicateLimit) violation = "Repeated message detected";
   else if (message.mentions.everyone || message.mentions.users.size + message.mentions.roles.size >= rules.massMentionLimit) violation = "Mass mention limit exceeded";
-  else if (normalized && rules.blockInvites && /(?:discord\\.gg\\/|discord(?:app)?\\.com\\/invite\\/)[a-z0-9-]+/i.test(normalized)) violation = "Unwanted Discord invite link detected";
+  else if (normalized && rules.blockInvites && /(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)[a-z0-9-]+/i.test(normalized)) violation = "Unwanted Discord invite link detected";
   else if (normalized && rules.blockedPhrases.some(phrase => normalized.includes(phrase.toLowerCase()))) violation = "Configured blocked phrase detected";
   if (!violation) return false;
 
