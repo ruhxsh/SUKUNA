@@ -43,15 +43,17 @@ export async function handleModerationCommand(message, args, store) {
   const botMember = guild.members.me;
   if (!command) return;
 
-  const permission = ["kick", "ban", "unban"].includes(command)
-    ? PermissionFlagsBits.BanMembers
-    : ["timeout", "untimeout"].includes(command)
-      ? PermissionFlagsBits.ModerateMembers
-      : ["setmodlog", "disablemodlog", "clearwarnings", "removewarn"].includes(command)
-        ? PermissionFlagsBits.ManageGuild
-        : PermissionFlagsBits.ModerateMembers;
+  const permission = command === "kick"
+    ? PermissionFlagsBits.KickMembers
+    : ["ban", "unban"].includes(command)
+      ? PermissionFlagsBits.BanMembers
+      : ["timeout", "untimeout", "warn", "warnings"].includes(command)
+        ? PermissionFlagsBits.ModerateMembers
+        : ["setmodlog", "disablemodlog", "clearwarnings", "removewarn"].includes(command)
+          ? PermissionFlagsBits.ManageGuild
+          : null;
 
-  if (!hasModeratorPermission(member, permission)) {
+  if (permission && !hasModeratorPermission(member, permission)) {
     await logModeration(message.client, store, guild, {
       action: command, targetId: args[0] || "N/A", moderatorId: message.author.id,
       reason: "Permission denied", result: "failed"
