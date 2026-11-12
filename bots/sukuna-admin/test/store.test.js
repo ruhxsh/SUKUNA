@@ -56,3 +56,31 @@ test("configuration is bounded and ignores invalid values", async () => {
     assert.equal(config.security.raidJoinLimit, 3);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+test("failed persistence rolls back warning and configuration mutations", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  try {
+    const store = await new JsonStore(path.join(directory, "store.json")).init();
+    store.persist = async () => { throw new Error("simulated disk failure"); };
+    await assert.rejects(store.addWarning({ ...ids, reason: "Should roll back" }), /simulated disk failure/);
+    assert.equal(store.getWarnings(ids.guildId, ids.targetId).length, 0);
+    await assert.rejects(store.updateConfig(ids.guildId, config => ({ ...config, modLogChannelId: "52345678901234567" })), /simulated disk failure/);
+    assert.equal(store.getConfig(ids.guildId).modLogChannelId, null);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test("invalid database is backed up instead of silently overwritten", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  const file = path.join(directory, "store.json");
+  try {
+    await fs.writeFile(file, "{ invalid json", "utf8");
+    const originalError = console.error;
+    console.error = () => {};
+    try { await new JsonStore(file).init(); }
+    finally { console.error = originalError; }
+    const files = await fs.readdir(directory);
+    assert.ok(files.some(name => name.startsWith("store.json.corrupt-")));
+    const fresh = JSON.parse(await fs.readFile(file, "utf8"));
+    assert.equal(fresh.version, 2);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
