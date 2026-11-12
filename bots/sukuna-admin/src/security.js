@@ -38,7 +38,7 @@ export async function handleAutomodMessage(message, store) {
   else if (normalized && state.recent.filter(item => item.content === normalized).length >= rules.duplicateLimit) violation = "Repeated message detected";
   else if (message.mentions.everyone || message.mentions.users.size + message.mentions.roles.size >= rules.massMentionLimit) violation = "Mass mention limit exceeded";
   else if (normalized && rules.blockedPhrases.some(phrase => normalized.includes(phrase.toLowerCase()))) violation = "Configured blocked phrase detected";
-  if (!violation) return;
+  if (!violation) return false;
 
   let result = "alert";
   if (rules.action === "delete") {
@@ -54,6 +54,7 @@ export async function handleAutomodMessage(message, store) {
     action: "automod", targetId: message.author.id, moderatorId: message.client.user.id,
     reason: violation, result
   });
+  return true;
 }
 
 export async function handleRaidJoin(member, store) {
