@@ -97,16 +97,20 @@ export class JsonStore {
     const guild = this.getGuild(guildId);
     const next = updater(structuredClone(guild.config));
     if (!isObject(next)) throw new TypeError("Invalid configuration update.");
+    const previous = guild.config;
     guild.config = normalizeConfig(next);
-    await this.persist();
+    try { await this.persist(); }
+    catch (error) { guild.config = previous; throw error; }
     return this.getConfig(guildId);
   }
 
   async addWarning({ guildId, targetId, moderatorId, reason }) {
     if (!snowflake(guildId) || !snowflake(targetId) || !snowflake(moderatorId)) throw new TypeError("Invalid Discord ID.");
     const record = { id: randomUUID(), targetId, moderatorId, reason: String(reason || "No reason supplied").slice(0, 500), createdAt: new Date().toISOString() };
-    this.getGuild(guildId).warnings.push(record);
-    await this.persist();
+    const records = this.getGuild(guildId).warnings;
+    records.push(record);
+    try { await this.persist(); }
+    catch (error) { records.pop(); throw error; }
     return { ...record };
   }
 
@@ -120,16 +124,18 @@ export class JsonStore {
     const index = records.findIndex(w => w.targetId === targetId && w.id === warningId);
     if (index < 0) return null;
     const [removed] = records.splice(index, 1);
-    await this.persist();
+    try { await this.persist(); }
+    catch (error) { records.splice(index, 0, removed); throw error; }
     return { ...removed };
   }
 
   async clearWarnings(guildId, targetId) {
     const guild = this.getGuild(guildId);
-    const before = guild.warnings.length;
-    guild.warnings = guild.warnings.filter(w => w.targetId !== targetId);
-    await this.persist();
-    return before - guild.warnings.length;
+    const previous = guild.warnings;
+    guild.warnings = previous.filter(w => w.targetId !== targetId);
+    try { await this.persist(); }
+    catch (error) { guild.warnings = previous; throw error; }
+    return previous.length - guild.warnings.length;
   }
 
   async persist() {
