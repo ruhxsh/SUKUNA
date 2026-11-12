@@ -34,3 +34,10 @@ jobs:
 
       - name: Run type checks
         run: pnpm typecheck
+
+      - name: Test isolated counting system
+        working-directory: bots/sukuna-gaming/counting
+        run: |
+          npm install --ignore-scripts
+          npm run check
+          npm test
