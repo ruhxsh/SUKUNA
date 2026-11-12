@@ -116,3 +116,38 @@ test("older warning records receive stable numbers during database normalization
     assert.deepEqual(store.getWarnings(ids.guildId, ids.targetId).map(w => w.number), [2, 1]);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+test("clearing warnings archives history and restarts active numbering at one", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  const file = path.join(directory, "store.json");
+  try {
+    const store = await new JsonStore(file).init();
+    const oldOne = await store.addWarning({ ...ids, reason: "Old first reason" });
+    const oldTwo = await store.addWarning({ ...ids, reason: "Old second reason" });
+    assert.equal(await store.clearWarnings(ids.guildId, ids.targetId), 2);
+    assert.equal(store.getWarnings(ids.guildId, ids.targetId).length, 0);
+    assert.deepEqual(store.getWarningHistory(ids.guildId, ids.targetId).map(w => w.status), ["cleared", "cleared"]);
+    const fresh = await store.addWarning({ ...ids, reason: "New first reason" });
+    assert.equal(fresh.number, 1);
+    assert.deepEqual(store.getWarnings(ids.guildId, ids.targetId).map(w => w.number), [1]);
+    const history = store.getWarningHistory(ids.guildId, ids.targetId);
+    assert.equal(history.length, 3);
+    assert.ok(history.some(w => w.id === oldOne.id && w.reason === "Old first reason"));
+    assert.ok(history.some(w => w.id === oldTwo.id && w.reason === "Old second reason"));
+    assert.ok(history.some(w => w.id === fresh.id && w.status === "active"));
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test("removing an active warning archives it without deleting its reason", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  try {
+    const store = await new JsonStore(path.join(directory, "store.json")).init();
+    const warning = await store.addWarning({ ...ids, reason: "Keep this reason" });
+    await store.removeWarning(ids.guildId, ids.targetId, warning.number);
+    assert.equal(store.getWarnings(ids.guildId, ids.targetId).length, 0);
+    const history = store.getWarningHistory(ids.guildId, ids.targetId);
+    assert.equal(history.length, 1);
+    assert.equal(history[0].status, "removed");
+    assert.equal(history[0].reason, "Keep this reason");
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
