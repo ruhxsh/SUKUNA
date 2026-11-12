@@ -28,7 +28,7 @@ client.on("messageCreate", async message => {
   if (!message.guild || message.author.bot) return;
   const content = message.content.trim();
   if (content.slice(0, PREFIX.length).toLowerCase() !== PREFIX) return;
-  if (content.length > PREFIX.length && !/\\s/.test(content[PREFIX.length])) return;
+  if (content.length > PREFIX.length && !/\s/.test(content[PREFIX.length])) return;
   const remainder = content.slice(PREFIX.length).trim();
   if (!remainder) return;
   const args = remainder.match(/"[^"]*"|'[^']*'|\S+/g) || [];
