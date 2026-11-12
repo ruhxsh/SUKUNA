@@ -52,7 +52,21 @@ function normalizeState(value) {
       snowflake(w.targetId) && snowflake(w.moderatorId) &&
       typeof w.reason === "string" && typeof w.createdAt === "string" &&
       !Number.isNaN(Date.parse(w.createdAt))
-    ).map(w => ({ id: w.id.slice(0, 80), targetId: w.targetId, moderatorId: w.moderatorId, reason: w.reason.slice(0, 500), createdAt: w.createdAt })) : [];
+    ).map(w => ({
+      id: w.id.slice(0, 80), number: Number.isSafeInteger(w.number) && w.number > 0 ? w.number : 0,
+      targetId: w.targetId, moderatorId: w.moderatorId,
+      reason: w.reason.slice(0, 500), createdAt: w.createdAt
+    })) : [];
+    const byTarget = new Map();
+    for (const warning of warnings) {
+      if (!byTarget.has(warning.targetId)) byTarget.set(warning.targetId, []);
+      byTarget.get(warning.targetId).push(warning);
+    }
+    for (const memberWarnings of byTarget.values()) {
+      memberWarnings.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      let nextNumber = Math.max(0, ...memberWarnings.map(w => w.number));
+      for (const warning of memberWarnings) if (warning.number === 0) warning.number = ++nextNumber;
+    }
     state.guilds[guildId] = { config: normalizeConfig(guild.config), warnings };
   }
   return state;
@@ -117,8 +131,9 @@ export class JsonStore {
   async addWarning({ guildId, targetId, moderatorId, reason }) {
     return this.runMutation(async () => {
       if (!snowflake(guildId) || !snowflake(targetId) || !snowflake(moderatorId)) throw new TypeError("Invalid Discord ID.");
-      const record = { id: randomUUID(), targetId, moderatorId, reason: String(reason || "No reason supplied").slice(0, 500), createdAt: new Date().toISOString() };
       const records = this.getGuild(guildId).warnings;
+      const number = records.filter(w => w.targetId === targetId).reduce((max, w) => Math.max(max, w.number || 0), 0) + 1;
+      const record = { id: randomUUID(), number, targetId, moderatorId, reason: String(reason || "No reason supplied").slice(0, 500), createdAt: new Date().toISOString() };
       records.push(record);
       try { await this.persist(); }
       catch (error) { records.splice(records.findIndex(item => item.id === record.id), 1); throw error; }
@@ -131,10 +146,10 @@ export class JsonStore {
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map(w => ({ ...w }));
   }
 
-  async removeWarning(guildId, targetId, warningId) {
+  async removeWarning(guildId, targetId, warningNumber) {
     return this.runMutation(async () => {
       const records = this.getGuild(guildId).warnings;
-      const index = records.findIndex(w => w.targetId === targetId && w.id === warningId);
+      const index = records.findIndex(w => w.targetId === targetId && w.number === Number(warningNumber));
       if (index < 0) return null;
       const [removed] = records.splice(index, 1);
       try { await this.persist(); }
