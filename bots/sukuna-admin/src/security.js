@@ -82,14 +82,15 @@ export async function handleRaidJoin(member, store) {
   const accountAgeMs = Number.isFinite(accountCreated) ? Date.now() - accountCreated : null;
   const belowAgeLimit = accountAgeMs !== null && accountAgeMs < rules.minimumAccountAgeDays * 86400000;
 
-  if (rules.accountAgeAlertsEnabled && belowAgeLimit) {
+  const suspiciousSignals = rules.suspiciousAccountDetectionEnabled && belowAgeLimit && member.user?.avatar === null;
+  if (rules.accountAgeAlertsEnabled && belowAgeLimit && !suspiciousSignals) {
     await logModeration(member.client, store, member.guild, {
       action: "new-account-alert", targetId: member.id, moderatorId: member.client.user.id,
       reason: "Account age is below the configured " + rules.minimumAccountAgeDays + "-day threshold. Alert only.",
       result: "alert"
     });
   }
-  if (rules.suspiciousAccountDetectionEnabled && belowAgeLimit && member.user?.avatar === null) {
+  if (suspiciousSignals) {
     await logModeration(member.client, store, member.guild, {
       action: "suspicious-account-alert", targetId: member.id, moderatorId: member.client.user.id,
       reason: "Combined signals: account is younger than " + rules.minimumAccountAgeDays +
