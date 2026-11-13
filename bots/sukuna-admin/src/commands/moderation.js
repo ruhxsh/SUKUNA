@@ -122,10 +122,36 @@ export async function handleModerationCommand(message, args, store) {
   if (command === "automod") {
     const [sub, ...rest] = args;
     const current = store.getConfig(guild.id).automod;
-    if (sub === "status") return void await message.reply("Automod: " + (current.enabled ? "ON" : "OFF") + " | action: " + current.action + " | rate: " + current.maxMessages + "/" + current.intervalMs + "ms | duplicates: " + current.duplicateLimit + " | mention limit: " + current.massMentionLimit + " | blocked phrases: " + current.blockedPhrases.length + " | invite links: " + (current.blockInvites ? "blocked" : "allowed"));
+    if (sub === "status") return void await message.reply(
+      "Automod: " + (current.enabled ? "ON" : "OFF") + " | action: " + current.action +
+      " | rate: " + current.maxMessages + "/" + current.intervalMs + "ms | duplicates: " + current.duplicateLimit +
+      " | mentions: " + (current.blockMentions ? "ON (limit " + current.massMentionLimit + ")" : "OFF") +
+      " | links: " + (current.blockLinks ? "BLOCKED" : "allowed") + " | invites: " + (current.blockInvites ? "blocked" : "allowed") +
+      " | caps: " + (current.blockCaps ? "ON" : "OFF") + " | blocked phrases: " + current.blockedPhrases.length +
+      " | whitelist: " + current.whitelistPhrases.length + " | ignored channels: " + current.ignoredChannelIds.length +
+      " | ignored roles: " + current.ignoredRoleIds.length
+    );
     if (sub === "on" || sub === "off") {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, enabled: sub === "on" } }));
       return void await message.reply("Automod is now " + sub.toUpperCase() + ". Review settings with s automod status.");
+    }
+    if (["links", "caps", "mentions"].includes(sub) && ["on", "off"].includes(rest[0])) {
+      const field = sub === "links" ? "blockLinks" : sub === "caps" ? "blockCaps" : "blockMentions";
+      await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, [field]: rest[0] === "on" } }));
+      await logConfigChange(message, store, "Automod " + sub + " filtering set to " + rest[0].toUpperCase() + ".");
+      return void await message.reply("Automod " + sub + " filtering is now " + rest[0].toUpperCase() + ".");
+    }
+    if (sub === "whitelist" && ["add", "remove"].includes(rest[0])) {
+      const phrase = rest.slice(1).join(" ").trim().slice(0, 100);
+      if (phrase.length < 2) return void await message.reply('Provide a word or phrase of at least 2 characters. Example: s automod whitelist add "approved phrase".');
+      await store.updateConfig(guild.id, c => {
+        const list = c.automod.whitelistPhrases;
+        const exists = list.some(item => item.toLowerCase() === phrase.toLowerCase());
+        const next = rest[0] === "add" ? (exists ? list : [...list, phrase].slice(0, 100)) : list.filter(item => item.toLowerCase() !== phrase.toLowerCase());
+        return { ...c, automod: { ...c.automod, whitelistPhrases: next } };
+      });
+      await logConfigChange(message, store, "Automod whitelist " + rest[0] + ": " + phrase);
+      return void await message.reply("Automod whitelist updated. Only the matching phrase is exempt from blocked-phrase detection; other checks still apply.");
     }
     if (sub === "invites" && ["on", "off"].includes(rest[0])) {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, blockInvites: rest[0] === "on" } }));
@@ -166,7 +192,7 @@ export async function handleModerationCommand(message, args, store) {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, maxMessages: rate, intervalMs: interval, duplicateLimit: duplicates, massMentionLimit: mentions } }));
       return void await message.reply("Automod thresholds updated.");
     }
-    return void await message.reply("Use s automod on|off|status, s automod action alert|delete, s automod invites on|off, s automod block add|remove phrase, s automod ignore channel|role add|remove, or s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT.");
+    return void await message.reply("Use s automod on|off|status, s automod links|caps|mentions on|off, s automod whitelist add|remove phrase, s automod action alert|delete, s automod invites on|off, s automod block add|remove phrase, s automod ignore channel|role add|remove, or s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT.");
   }
 
   if (command === "raid") {
