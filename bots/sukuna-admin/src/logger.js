@@ -20,7 +20,7 @@ export async function logModeration(client, store, guild, details) {
   };
   console.log("[MODERATION]", JSON.stringify({ guildId: guild?.id, ...entry }));
   if (!guild) return;
-  if (store?.recordModeration) {
+  if (store?.recordModeration && entry.action !== "warn") {
     try {
       await store.recordModeration({
         guildId: guild.id, targetId: entry.targetId, moderatorId: entry.moderatorId,
