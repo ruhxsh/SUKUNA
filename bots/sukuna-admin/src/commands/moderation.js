@@ -13,6 +13,9 @@ async function getUserMention(guild, id) {
 }
 const reasonFrom = (args, start = 1) => args.slice(start).join(" ").trim().slice(0, 500) || DEFAULT_REASON;
 const mentionIdFrom = token => /^<@!?(\d{17,20})>$/.exec(token || "")?.[1] || (isSnowflake(token) ? token : null);
+const summarizeIds = ids => ids.length
+  ? ids.slice(0, 5).map(id => "`" + id + "`").join(", ") + (ids.length > 5 ? " +" + (ids.length - 5) + " more" : "")
+  : "none";
 function parseWindow(value) {
   const match = /^(\d+)(s|m)$/i.exec(value || "");
   if (!match) return null;
@@ -134,7 +137,9 @@ export async function handleModerationCommand(message, args, store) {
       " | links: " + (current.blockLinks ? "BLOCKED" : "allowed") + " | invites: " + (current.blockInvites ? "blocked" : "allowed") +
       " | caps: " + (current.blockCaps ? "ON" : "OFF") + " | blocked phrases: " + current.blockedPhrases.length +
       " | whitelist: " + current.whitelistPhrases.length + " | ignored channels: " + current.ignoredChannelIds.length +
-      " | ignored roles: " + current.ignoredRoleIds.length
+      " | ignored roles: " + current.ignoredRoleIds.length +
+      " | ignored channel IDs: " + summarizeIds(current.ignoredChannelIds) +
+      " | ignored role IDs: " + summarizeIds(current.ignoredRoleIds)
     );
     if (sub === "on" || sub === "off") {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, enabled: sub === "on" } }));
@@ -276,7 +281,8 @@ export async function handleModerationCommand(message, args, store) {
         "Suspicious accounts: " + (current.suspiciousAccountDetectionEnabled ? "ON" : "OFF") +
         " | signals: below age threshold + default avatar | alert only\n" +
         "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") +
-        " | missing bot permissions: " + (missing.length ? missing.join(", ") : "none detected");
+        " | missing bot permissions: " + (missing.length ? missing.join(", ") : "none detected") +
+        "\\nIgnored channels: " + summarizeIds(auto.ignoredChannelIds) + " | ignored roles: " + summarizeIds(auto.ignoredRoleIds);
       return void await message.reply(report);
     }
     if (sub === "suspicious" && ["on", "off"].includes(setting)) {
