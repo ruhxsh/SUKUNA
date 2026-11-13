@@ -9,6 +9,10 @@ export const DEFAULT_CONFIG = Object.freeze({
     enabled: false,
     action: "delete",
     blockInvites: false,
+    blockLinks: false,
+    blockCaps: false,
+    blockMentions: true,
+    whitelistPhrases: [],
     maxMessages: 6,
     intervalMs: 7000,
     duplicateLimit: 4,
@@ -23,7 +27,10 @@ export const DEFAULT_CONFIG = Object.freeze({
     raidWindowMs: 15000,
     alertCooldownMs: 60000,
     accountAgeAlertsEnabled: false,
-    minimumAccountAgeDays: 7
+    minimumAccountAgeDays: 7,
+    suspiciousAccountDetectionEnabled: false,
+    raidAction: "alert",
+    raidWhitelistIds: []
   }
 });
 export function getDataFilePath() {
