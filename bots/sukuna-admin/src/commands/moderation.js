@@ -96,6 +96,29 @@ export async function handleModerationCommand(message, args, store) {
     return;
   }
 
+  if (command === "modlog" && args[0]?.toLowerCase() === "status") {
+    const channelId = store.getConfig(guild.id).modLogChannelId;
+    if (!channelId) return void await message.reply("Moderation logging is DISABLED. No destination channel is configured.");
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel?.isTextBased()) return void await message.reply("Moderation logging is configured, but its channel is missing or is not a text channel: <#" + channelId + ">.");
+    const permissions = channel.permissionsFor(botMember);
+    const ready = permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]);
+    return void await message.reply("Moderation logging is CONFIGURED for <#" + channelId + "> and is " + (ready ? "READY" : "NOT READY") + ". " + (ready ? "The bot can view the channel, send messages, and embed logs." : "Check View Channel, Send Messages, and Embed Links permissions."));
+  }
+
+  if (command === "banlist") {
+    try {
+      const bans = await guild.bans.fetch({ limit: 1000 });
+      if (!bans.size) return void await message.reply("There are no banned users in this server.");
+      const lines = [...bans.values()].slice(0, 20).map(ban =>
+        "**" + ban.user.username + "** (`" + ban.user.id + "`) — " + String(ban.reason || "No reason recorded").slice(0, 100)
+      );
+      return void await message.reply("**Server ban list** — " + bans.size + " record(s) fetched. Showing up to 20:\n" + lines.join("\n").slice(0, 1700));
+    } catch (error) {
+      return void await message.reply("Could not fetch the ban list. Check that I have the Ban Members permission.");
+    }
+  }
+
   if (command === "automod") {
     const [sub, ...rest] = args;
     const current = store.getConfig(guild.id).automod;
