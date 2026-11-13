@@ -11,9 +11,11 @@ function normalizeConfig(input) {
   const config = isObject(input) ? input : {};
   const automod = isObject(config.automod) ? config.automod : {};
   const security = isObject(config.security) ? config.security : {};
-  const phrases = Array.isArray(automod.blockedPhrases)
-    ? [...new Set(automod.blockedPhrases.filter(v => typeof v === "string").map(v => v.trim().slice(0, 100)).filter(Boolean))].slice(0, 100)
+  const cleanPhrases = value => Array.isArray(value)
+    ? [...new Set(value.filter(v => typeof v === "string").map(v => v.trim().slice(0, 100)).filter(Boolean))].slice(0, 100)
     : [];
+  const phrases = cleanPhrases(automod.blockedPhrases);
+  const whitelistPhrases = cleanPhrases(automod.whitelistPhrases);
   const ids = value => Array.isArray(value) ? [...new Set(value.filter(snowflake))].slice(0, 100) : [];
   return {
     modLogChannelId: snowflake(config.modLogChannelId) ? config.modLogChannelId : null,
@@ -21,6 +23,10 @@ function normalizeConfig(input) {
       enabled: automod.enabled === true,
       action: ["alert", "delete"].includes(automod.action) ? automod.action : DEFAULT_CONFIG.automod.action,
       blockInvites: automod.blockInvites === true,
+      blockLinks: automod.blockLinks === true,
+      blockCaps: automod.blockCaps === true,
+      blockMentions: automod.blockMentions !== false,
+      whitelistPhrases,
       maxMessages: Number.isInteger(automod.maxMessages) ? Math.min(30, Math.max(3, automod.maxMessages)) : DEFAULT_CONFIG.automod.maxMessages,
       intervalMs: Number.isInteger(automod.intervalMs) ? Math.min(60000, Math.max(3000, automod.intervalMs)) : DEFAULT_CONFIG.automod.intervalMs,
       duplicateLimit: Number.isInteger(automod.duplicateLimit) ? Math.min(10, Math.max(2, automod.duplicateLimit)) : DEFAULT_CONFIG.automod.duplicateLimit,
@@ -35,7 +41,10 @@ function normalizeConfig(input) {
       raidWindowMs: Number.isInteger(security.raidWindowMs) ? Math.min(300000, Math.max(5000, security.raidWindowMs)) : DEFAULT_CONFIG.security.raidWindowMs,
       alertCooldownMs: Number.isInteger(security.alertCooldownMs) ? Math.min(600000, Math.max(10000, security.alertCooldownMs)) : DEFAULT_CONFIG.security.alertCooldownMs,
       accountAgeAlertsEnabled: security.accountAgeAlertsEnabled === true,
-      minimumAccountAgeDays: Number.isInteger(security.minimumAccountAgeDays) ? Math.min(365, Math.max(1, security.minimumAccountAgeDays)) : DEFAULT_CONFIG.security.minimumAccountAgeDays
+      minimumAccountAgeDays: Number.isInteger(security.minimumAccountAgeDays) ? Math.min(365, Math.max(1, security.minimumAccountAgeDays)) : DEFAULT_CONFIG.security.minimumAccountAgeDays,
+      suspiciousAccountDetectionEnabled: security.suspiciousAccountDetectionEnabled === true,
+      raidAction: security.raidAction === "alert" ? "alert" : "alert",
+      raidWhitelistIds: ids(security.raidWhitelistIds)
     }
   };
 }
@@ -88,7 +97,17 @@ function normalizeState(value) {
       let nextNumber = Math.max(0, ...memberWarnings.map(w => w.number));
       for (const warning of memberWarnings) if (warning.number === 0) warning.number = ++nextNumber;
     }
-    state.guilds[guildId] = { config: normalizeConfig(guild.config), warnings, warningHistory };
+    const moderationHistory = Array.isArray(guild.moderationHistory) ? guild.moderationHistory
+      .filter(item => isObject(item) && snowflake(item.targetId) && snowflake(item.moderatorId) &&
+        typeof item.action === "string" && typeof item.createdAt === "string" && !Number.isNaN(Date.parse(item.createdAt)))
+      .slice(-1000).map(item => ({
+        id: typeof item.id === "string" ? item.id.slice(0, 80) : randomUUID(),
+        targetId: item.targetId, moderatorId: item.moderatorId,
+        action: item.action.slice(0, 80), reason: String(item.reason || "No reason supplied").slice(0, 500),
+        duration: String(item.duration || "N/A").slice(0, 80),
+        result: String(item.result || "unknown").slice(0, 40), createdAt: item.createdAt
+      })) : [];
+    state.guilds[guildId] = { config: normalizeConfig(guild.config), warnings, warningHistory, moderationHistory };
   }
   return state;
 }
@@ -130,7 +149,7 @@ export class JsonStore {
   }
 
   getGuild(guildId) {
-    if (!this.state.guilds[guildId]) this.state.guilds[guildId] = { config: structuredClone(DEFAULT_CONFIG), warnings: [], warningHistory: [] };
+    if (!this.state.guilds[guildId]) this.state.guilds[guildId] = { config: structuredClone(DEFAULT_CONFIG), warnings: [], warningHistory: [], moderationHistory: [] };
     return this.state.guilds[guildId];
   }
 
@@ -204,6 +223,33 @@ export class JsonStore {
         throw error;
       }
       return removed.length;
+    });
+  }
+
+  getModerationHistory(guildId, targetId) {
+    return this.getGuild(guildId).moderationHistory
+      .filter(item => item.targetId === targetId)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+      .map(item => ({ ...item }));
+  }
+
+  async recordModeration({ guildId, targetId, moderatorId, action, reason, duration, result, createdAt }) {
+    return this.runMutation(async () => {
+      if (!snowflake(guildId) || !snowflake(targetId) || !snowflake(moderatorId)) return false;
+      const history = this.getGuild(guildId).moderationHistory;
+      const record = {
+        id: randomUUID(), targetId, moderatorId,
+        action: String(action || "unknown").slice(0, 80),
+        reason: String(reason || "No reason supplied").slice(0, 500),
+        duration: String(duration || "N/A").slice(0, 80),
+        result: String(result || "unknown").slice(0, 40),
+        createdAt: createdAt || new Date().toISOString()
+      };
+      history.push(record);
+      if (history.length > 1000) history.splice(0, history.length - 1000);
+      try { await this.persist(); }
+      catch (error) { history.splice(history.findIndex(item => item.id === record.id), 1); throw error; }
+      return true;
     });
   }
 
