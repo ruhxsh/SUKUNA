@@ -70,6 +70,41 @@ test("failed persistence rolls back warning and configuration mutations", async 
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
 
+test("moderation history persists and remains bounded per guild", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  const file = path.join(directory, "store.json");
+  try {
+    const store = await new JsonStore(file).init();
+    await store.recordModeration({ guildId: ids.guildId, targetId: ids.targetId, moderatorId: ids.moderatorId, action: "ban", reason: "Test reason", result: "success" });
+    const reloaded = await new JsonStore(file).init();
+    const history = reloaded.getModerationHistory(ids.guildId, ids.targetId);
+    assert.equal(history.length, 1);
+    assert.equal(history[0].action, "ban");
+    assert.equal(history[0].reason, "Test reason");
+    assert.equal(history[0].result, "success");
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test("legacy version 2 data gains new defaults without losing warnings", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  const file = path.join(directory, "store.json");
+  try {
+    await fs.writeFile(file, JSON.stringify({ version: 2, guilds: {
+      [ids.guildId]: { config: { modLogChannelId: "52345678901234567" }, warnings: [
+        { id: "legacy-warning", targetId: ids.targetId, moderatorId: ids.moderatorId, reason: "Keep me", createdAt: "2026-01-01T00:00:00.000Z" }
+      ] }
+    }}), "utf8");
+    const store = await new JsonStore(file).init();
+    const config = store.getConfig(ids.guildId);
+    assert.equal(config.modLogChannelId, "52345678901234567");
+    assert.equal(config.automod.blockMentions, true);
+    assert.deepEqual(config.automod.whitelistPhrases, []);
+    assert.equal(config.security.raidAction, "alert");
+    assert.equal(store.getWarnings(ids.guildId, ids.targetId)[0].reason, "Keep me");
+    assert.deepEqual(store.getModerationHistory(ids.guildId, ids.targetId), []);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
 test("invalid database is backed up instead of silently overwritten", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
   const file = path.join(directory, "store.json");
