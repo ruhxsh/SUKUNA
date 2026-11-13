@@ -12,9 +12,9 @@ async function getUserMention(guild, id) {
   return user ? "<@" + user.id + ">" : "<@" + id + ">";
 }
 const reasonFrom = (args, start = 1) => args.slice(start).join(" ").trim().slice(0, 500) || DEFAULT_REASON;
-const mentionIdFrom = token => /^<@!?(\\d{17,20})>$/.exec(token || "")?.[1] || (isSnowflake(token) ? token : null);
+const mentionIdFrom = token => /^<@!?(\d{17,20})>$/.exec(token || "")?.[1] || (isSnowflake(token) ? token : null);
 function parseWindow(value) {
-  const match = /^(\\d+)(s|m)$/i.exec(value || "");
+  const match = /^(\d+)(s|m)$/i.exec(value || "");
   if (!match) return null;
   const ms = Number(match[1]) * (match[2].toLowerCase() === "s" ? 1000 : 60000);
   return Number.isSafeInteger(ms) && ms >= 5000 && ms <= 300000 ? ms : null;
