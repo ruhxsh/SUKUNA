@@ -9,9 +9,22 @@ async function getUserMention(guild, id) {
   const member = await guild.members.fetch(id).catch(() => null);
   if (member) return "<@" + member.id + ">";
   const user = await guild.client.users.fetch(id).catch(() => null);
-  return user ? "<@" + user.id + ">" : "Unknown member";
+  return user ? "<@" + user.id + ">" : "<@" + id + ">";
 }
 const reasonFrom = (args, start = 1) => args.slice(start).join(" ").trim().slice(0, 500) || DEFAULT_REASON;
+const mentionIdFrom = token => /^<@!?(\\d{17,20})>$/.exec(token || "")?.[1] || (isSnowflake(token) ? token : null);
+function parseWindow(value) {
+  const match = /^(\\d+)(s|m)$/i.exec(value || "");
+  if (!match) return null;
+  const ms = Number(match[1]) * (match[2].toLowerCase() === "s" ? 1000 : 60000);
+  return Number.isSafeInteger(ms) && ms >= 5000 && ms <= 300000 ? ms : null;
+}
+async function logConfigChange(message, store, reason) {
+  await logModeration(message.client, store, message.guild, {
+    action: "security-config", targetId: message.author.id, moderatorId: message.author.id,
+    reason, result: "success"
+  });
+}
 const parseDuration = input => {
   const match = /^(\d+)([smhd])$/i.exec(input || "");
   if (!match) return null;
@@ -42,9 +55,9 @@ export async function handleModerationCommand(message, args, store) {
   if (!command) return;
 
   const permission = command === "kick" ? PermissionFlagsBits.KickMembers
-    : ["ban", "unban"].includes(command) ? PermissionFlagsBits.BanMembers
-    : ["timeout", "untimeout", "warn", "warnings", "warninghistory"].includes(command) ? PermissionFlagsBits.ModerateMembers
-    : ["setmodlog", "disablemodlog", "clearwarnings", "removewarn", "automod", "raid", "security"].includes(command) ? PermissionFlagsBits.ManageGuild
+    : ["ban", "unban", "banlist"].includes(command) ? PermissionFlagsBits.BanMembers
+    : ["timeout", "untimeout", "warn", "warnings", "warninghistory", "modhistory"].includes(command) ? PermissionFlagsBits.ModerateMembers
+    : ["setmodlog", "disablemodlog", "modlog", "clearwarnings", "removewarn", "automod", "raid", "security"].includes(command) ? PermissionFlagsBits.ManageGuild
     : null;
 
   if (permission && !hasModeratorPermission(member, permission)) {
