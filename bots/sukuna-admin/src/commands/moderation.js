@@ -198,18 +198,47 @@ export async function handleModerationCommand(message, args, store) {
   if (command === "raid") {
     const [sub, value] = args;
     const current = store.getConfig(guild.id).security;
-    if (sub === "status") return void await message.reply("Raid protection: " + (current.raidProtectionEnabled ? "ON" : "OFF") + " | alert threshold: " + current.raidJoinLimit + " joins / " + current.raidWindowMs + "ms. Detection only; no automatic punishment.");
+    if (sub === "status") return void await message.reply("Raid protection: " + (current.raidProtectionEnabled ? "ON" : "OFF") + " | threshold: " + current.raidJoinLimit + " joins / " + current.raidWindowMs + "ms | response: " + current.raidAction + " | trusted members: " + current.raidWhitelistIds.length + ". Alerts only; no automatic punishment.");
     if (sub === "on" || sub === "off") {
       await store.updateConfig(guild.id, c => ({ ...c, security: { ...c.security, raidProtectionEnabled: sub === "on" } }));
+      await logConfigChange(message, store, "Raid detection set to " + sub.toUpperCase() + ".");
       return void await message.reply("Raid detection is now " + sub.toUpperCase() + ". It only alerts; it does not punish members.");
+    }
+    if (sub === "threshold") {
+      const limit = Number(args[1]);
+      const windowMs = parseWindow(args[2]);
+      if (!Number.isInteger(limit) || limit < 3 || limit > 100 || !windowMs) return void await message.reply("Usage: s raid threshold 10 30s. Join threshold: 3–100; window: 5s–5m.");
+      await store.updateConfig(guild.id, c => ({ ...c, security: { ...c.security, raidJoinLimit: limit, raidWindowMs: windowMs } }));
+      await logConfigChange(message, store, "Raid threshold set to " + limit + " joins within " + args[2] + ".");
+      return void await message.reply("Raid threshold set to " + limit + " joins within " + args[2] + ". Alerts only.");
     }
     if (sub === "limit") {
       const limit = Number(value);
       if (!Number.isInteger(limit) || limit < 3 || limit > 100) return void await message.reply("Use a join threshold from 3 to 100.");
       await store.updateConfig(guild.id, c => ({ ...c, security: { ...c.security, raidJoinLimit: limit } }));
+      await logConfigChange(message, store, "Raid join threshold set to " + limit + ".");
       return void await message.reply("Raid alert threshold set to " + limit + " joins.");
     }
-    return void await message.reply("Use s raid on|off|status or s raid limit 10.");
+    if (sub === "action" && args[1]?.toLowerCase() === "set") {
+      const action = args[2]?.toLowerCase();
+      if (action !== "alert") return void await message.reply("The currently supported safe raid response is alert only. No automatic punishment or channel lockdown is available.");
+      await store.updateConfig(guild.id, c => ({ ...c, security: { ...c.security, raidAction: action } }));
+      await logConfigChange(message, store, "Raid response set to alert.");
+      return void await message.reply("Raid response set to ALERT only. No automatic punishment will be applied.");
+    }
+    if (sub === "whitelist" && ["add", "remove"].includes(value)) {
+      const id = mentionIdFrom(args[2]);
+      if (!id) return void await message.reply("Usage: s raid whitelist add|remove @member (or a Discord user ID).");
+      const exists = current.raidWhitelistIds.includes(id);
+      if (value === "add" && !exists && current.raidWhitelistIds.length >= 100) return void await message.reply("The raid whitelist is full (100 members).");
+      await store.updateConfig(guild.id, c => {
+        const list = c.security.raidWhitelistIds;
+        return { ...c, security: { ...c.security, raidWhitelistIds: value === "add" ? [...new Set([...list, id])] : list.filter(item => item !== id) } };
+      });
+      await logConfigChange(message, store, "Raid whitelist " + value + " member " + id + ".");
+      return void await message.reply("Raid whitelist updated for <@" + id + ">.", { allowedMentions: { parse: [] } });
+    }
+    return void await message.reply("Use s raid on|off|status, s raid threshold 10 30s, s raid action set alert, or s raid whitelist add|remove @member.");
   }
 
   if (command === "security") {
