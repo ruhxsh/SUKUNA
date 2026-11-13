@@ -16,14 +16,16 @@ function makeStore(overrides = {}) {
   const config = {
     modLogChannelId: null,
     automod: {
-      enabled: true, action: "delete", maxMessages: 20, intervalMs: 7000,
+      enabled: true, action: "delete", blockInvites: false, blockLinks: false, blockCaps: false,
+      blockMentions: true, whitelistPhrases: [], maxMessages: 20, intervalMs: 7000,
       duplicateLimit: 2, massMentionLimit: 3, blockedPhrases: [],
       ignoredChannelIds: [], ignoredRoleIds: []
     },
     security: {
       raidProtectionEnabled: false, raidJoinLimit: 3, raidWindowMs: 15000,
       alertCooldownMs: 60000, accountAgeAlertsEnabled: false,
-      minimumAccountAgeDays: 7
+      minimumAccountAgeDays: 7, suspiciousAccountDetectionEnabled: false,
+      raidAction: "alert", raidWhitelistIds: []
     },
     ...overrides
   };
@@ -101,6 +103,85 @@ test("automod catches @everyone and configured blocked phrases", async () => {
   const blocked = makeMessage({ content: "this contains a blocked phrase" });
   await handleAutomodMessage(blocked, phraseStore);
   assert.equal(blocked.wasDeleted(), true);
+});
+
+test("general link, excessive caps, and mention controls are independently configurable", async () => {
+  resetSecurityMemoryForTests();
+  const base = makeStore();
+  const config = base.getConfig(guildId);
+  config.automod.blockLinks = true;
+  const link = makeMessage({ content: "visit https://example.com" });
+  await handleAutomodMessage(link, { getConfig: () => config });
+  assert.equal(link.wasDeleted(), true);
+
+  resetSecurityMemoryForTests();
+  config.automod.blockLinks = false;
+  config.automod.blockCaps = true;
+  const caps = makeMessage({ content: "THIS MESSAGE IS WAY TOO LOUD" });
+  await handleAutomodMessage(caps, { getConfig: () => config });
+  assert.equal(caps.wasDeleted(), true);
+
+  resetSecurityMemoryForTests();
+  config.automod.blockCaps = false;
+  config.automod.blockMentions = false;
+  const mentions = makeMessage({ everyone: true });
+  await handleAutomodMessage(mentions, { getConfig: () => config });
+  assert.equal(mentions.wasDeleted(), false);
+});
+
+test("whitelist exempts only the matching blocked phrase", async () => {
+  resetSecurityMemoryForTests();
+  const config = makeStore().getConfig(guildId);
+  config.automod.blockedPhrases = ["approved phrase", "blocked phrase"];
+  config.automod.whitelistPhrases = ["approved phrase"];
+  const allowed = makeMessage({ content: "approved phrase only" });
+  await handleAutomodMessage(allowed, { getConfig: () => config });
+  assert.equal(allowed.wasDeleted(), false);
+
+  resetSecurityMemoryForTests();
+  const mixed = makeMessage({ content: "approved phrase and blocked phrase" });
+  await handleAutomodMessage(mixed, { getConfig: () => config });
+  assert.equal(mixed.wasDeleted(), true);
+});
+
+test("raid whitelist excludes trusted joins from raid thresholds", async () => {
+  resetSecurityMemoryForTests();
+  const config = makeStore().getConfig(guildId);
+  config.security.raidProtectionEnabled = true;
+  config.security.raidJoinLimit = 2;
+  config.security.raidWhitelistIds = ["22345678901234567"];
+  const member = {
+    id: "22345678901234567",
+    user: { createdTimestamp: Date.now() - 30 * 86400000, avatar: "custom" },
+    guild: { id: guildId },
+    client: { user: { id: "42345678901234567" } }
+  };
+  let logs = 0;
+  const original = console.log;
+  console.log = (...args) => { if (args[0] === "[MODERATION]") logs++; };
+  try {
+    await handleRaidJoin(member, { getConfig: () => config });
+    await handleRaidJoin(member, { getConfig: () => config });
+  } finally { console.log = original; }
+  assert.equal(logs, 0);
+});
+
+test("suspicious-account detection requires combined signals and only alerts", async () => {
+  resetSecurityMemoryForTests();
+  const config = makeStore().getConfig(guildId);
+  config.security.suspiciousAccountDetectionEnabled = true;
+  const member = {
+    id: "22345678901234567",
+    user: { createdTimestamp: Date.now() - 1000, avatar: null },
+    guild: { id: guildId },
+    client: { user: { id: "42345678901234567" } }
+  };
+  let logs = 0;
+  const original = console.log;
+  console.log = (...args) => { if (args[0] === "[MODERATION]") logs++; };
+  try { await handleRaidJoin(member, { getConfig: () => config }); }
+  finally { console.log = original; }
+  assert.equal(logs, 1);
 });
 
 test("raid and account-age checks are opt-in and alert without punishment", async () => {
