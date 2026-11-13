@@ -90,11 +90,13 @@ export async function handleModerationCommand(message, args, store) {
       return void await message.reply("I need View Channel, Send Messages, and Embed Links in that channel before it can be used for moderation logs.");
     }
     await store.updateConfig(guild.id, config => ({ ...config, modLogChannelId: channel.id }));
+    await logConfigChange(message, store, "Moderation log destination set to channel " + channel.id + ".");
     await message.reply("Moderation logs will be sent to <#" + channel.id + ">.");
     return;
   }
   if (command === "disablemodlog") {
     await store.updateConfig(guild.id, config => ({ ...config, modLogChannelId: null }));
+    await logConfigChange(message, store, "Discord moderation-log channel disabled; console logging remains active.");
     await message.reply("Channel logging disabled. Console logging remains enabled.");
     return;
   }
@@ -143,6 +145,7 @@ export async function handleModerationCommand(message, args, store) {
     );
     if (sub === "on" || sub === "off") {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, enabled: sub === "on" } }));
+      await logConfigChange(message, store, "AutoMod enabled state set to " + sub.toUpperCase() + ".");
       return void await message.reply("Automod is now " + sub.toUpperCase() + ". Review settings with s automod status.");
     }
     if (["links", "caps", "mentions"].includes(sub) && ["on", "off"].includes(rest[0])) {
@@ -166,6 +169,7 @@ export async function handleModerationCommand(message, args, store) {
     }
     if (sub === "invites" && ["on", "off"].includes(rest[0])) {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, blockInvites: rest[0] === "on" } }));
+      await logConfigChange(message, store, "AutoMod invite filtering set to " + rest[0].toUpperCase() + ".");
       return void await message.reply("Discord invite-link filtering is now " + rest[0].toUpperCase() + ".");
     }
     if (sub === "block" && ["add", "remove"].includes(rest[0])) {
@@ -178,10 +182,12 @@ export async function handleModerationCommand(message, args, store) {
         const next = rest[0] === "add" ? (exists ? list : [...list, phrase]) : list.filter(p => p.toLowerCase() !== phrase.toLowerCase());
         return { ...c, automod: { ...c.automod, blockedPhrases: next } };
       });
+      await logConfigChange(message, store, "AutoMod blocked phrase " + rest[0] + ": " + phrase);
       return void await message.reply("Blocked phrase list updated.");
     }
     if (sub === "action" && ["alert", "delete"].includes(rest[0])) {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, action: rest[0] } }));
+      await logConfigChange(message, store, "AutoMod action set to " + rest[0] + ".");
       return void await message.reply("Automod action set to " + rest[0] + ".");
     }
     if (sub === "ignore" && ["channel", "role"].includes(rest[0]) && ["add", "remove"].includes(rest[1])) {
@@ -195,6 +201,7 @@ export async function handleModerationCommand(message, args, store) {
           : current.filter(id => id !== target.id);
         return { ...c, automod: { ...c.automod, [field]: next } };
       });
+      await logConfigChange(message, store, "AutoMod ignored " + rest[0] + " " + target.id + " " + rest[1] + ".");
       return void await message.reply("Automod ignore list updated for " + rest[0] + " <" + (rest[0] === "channel" ? "#" : "@&") + target.id + ">.");
     }
     if (sub === "limits") {
@@ -202,6 +209,7 @@ export async function handleModerationCommand(message, args, store) {
       if (![rate, interval, duplicates, mentions].every(Number.isInteger)) return void await message.reply("Usage: s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT");
       if (rate < 3 || rate > 30 || interval < 3000 || interval > 60000 || duplicates < 2 || duplicates > 10 || mentions < 2 || mentions > 50) return void await message.reply("Limits: messages 3–30, interval 3000–60000ms, duplicates 2–10, mentions 2–50.");
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, maxMessages: rate, intervalMs: interval, duplicateLimit: duplicates, massMentionLimit: mentions } }));
+      await logConfigChange(message, store, "AutoMod thresholds updated: rate " + rate + "/" + interval + "ms, duplicates " + duplicates + ", mentions " + mentions + ".");
       return void await message.reply("Automod thresholds updated.");
     }
     return void await message.reply("Use s automod on|off|status, s automod links|caps|mentions on|off, s automod whitelist add|remove phrase, s automod action alert|delete, s automod invites on|off, s automod block add|remove phrase, s automod ignore channel|role add|remove, or s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT.");
@@ -299,12 +307,14 @@ export async function handleModerationCommand(message, args, store) {
     }
     if (sub === "account-age" && ["on", "off"].includes(setting)) {
       await store.updateConfig(guild.id, c => ({ ...c, security: { ...c.security, accountAgeAlertsEnabled: setting === "on" } }));
+      await logConfigChange(message, store, "New-account age alerts set to " + setting.toUpperCase() + ".");
       return void await message.reply("New-account age alerts are now " + setting.toUpperCase() + ". Alerts only; no automatic action.");
     }
     if (sub === "account-age-days") {
       const days = Number(setting);
       if (!Number.isInteger(days) || days < 1 || days > 365) return void await message.reply("Set an account-age threshold from 1 to 365 days.");
       await store.updateConfig(guild.id, c => ({ ...c, security: { ...c.security, minimumAccountAgeDays: days } }));
+      await logConfigChange(message, store, "New-account alert threshold set to " + days + " days.");
       return void await message.reply("New-account alert threshold set to " + days + " days.");
     }
     return void await message.reply("Use s security status, s security suspicious on|off, s security account-age on|off, or s security account-age-days 7.");
