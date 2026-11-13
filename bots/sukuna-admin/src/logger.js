@@ -20,6 +20,17 @@ export async function logModeration(client, store, guild, details) {
   };
   console.log("[MODERATION]", JSON.stringify({ guildId: guild?.id, ...entry }));
   if (!guild) return;
+  if (store?.recordModeration) {
+    try {
+      await store.recordModeration({
+        guildId: guild.id, targetId: entry.targetId, moderatorId: entry.moderatorId,
+        action: entry.action, reason: entry.reason, duration: entry.duration,
+        result: entry.result, createdAt: entry.timestamp
+      });
+    } catch (error) {
+      console.error("Could not persist moderation history:", error.message);
+    }
+  }
   const channelId = store.getConfig(guild.id).modLogChannelId;
   if (!channelId) return;
   try {
