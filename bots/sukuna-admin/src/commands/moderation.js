@@ -299,13 +299,32 @@ export async function handleModerationCommand(message, args, store) {
     return;
   }
 
-  const known = ["kick", "ban", "timeout", "untimeout", "warn", "warnings", "warninghistory", "removewarn", "clearwarnings"];
+  const known = ["kick", "ban", "timeout", "untimeout", "warn", "warnings", "warninghistory", "modhistory", "removewarn", "clearwarnings"];
   if (!known.includes(command)) return void await message.reply("Unknown command. Use s help.");
 
   const targetToken = args[0];
   const mentionId = /^<@!?(\d{17,20})>$/.exec(targetToken || "")?.[1];
   const targetId = mentionId || targetToken;
   if (!isSnowflake(targetId)) return void await message.reply("Target not found. Mention a member, or use their Discord ID if they have left the server.");
+  if (command === "modhistory") {
+    const targetLabel = await getUserMention(guild, targetId);
+    const actions = store.getModerationHistory(guild.id, targetId);
+    const warnings = store.getWarningHistory(guild.id, targetId).map(w => ({
+      action: "warn", targetId: w.targetId, moderatorId: w.moderatorId,
+      reason: w.reason, duration: "N/A", result: w.status || "active", createdAt: w.createdAt
+    }));
+    const records = [...actions, ...warnings].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12);
+    if (!records.length) return void await message.reply("No stored moderation history was found for that member. History is recorded from the date this feature is installed.");
+    const lines = await Promise.all(records.map(async item =>
+      "**" + item.action.toUpperCase() + " — " + String(item.result).toUpperCase() + "**\\nReason: " +
+      String(item.reason || "No reason recorded").slice(0, 220) + "\\nModerator: " +
+      await getUserMention(guild, item.moderatorId) + "\\nDate: " + item.createdAt +
+      (item.duration && item.duration !== "N/A" ? "\\nDuration: " + item.duration : "")
+    ));
+    const embed = new EmbedBuilder().setTitle("Moderation history for " + targetLabel).setDescription(lines.join("\\n\\n").slice(0, 4000));
+    return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+  }
+
   if (["warnings", "warninghistory", "removewarn", "clearwarnings"].includes(command)) {
     if (command === "warnings" || command === "warninghistory") {
       const records = command === "warnings"
