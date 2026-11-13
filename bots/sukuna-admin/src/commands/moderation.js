@@ -110,10 +110,15 @@ export async function handleModerationCommand(message, args, store) {
     try {
       const bans = await guild.bans.fetch({ limit: 1000 });
       if (!bans.size) return void await message.reply("There are no banned users in this server.");
-      const lines = [...bans.values()].slice(0, 20).map(ban =>
+      const entries = [...bans.values()];
+      const pageSize = 20;
+      const pages = Math.ceil(entries.length / pageSize);
+      const page = args[0] === undefined ? 1 : Number(args[0]);
+      if (!Number.isInteger(page) || page < 1 || page > pages) return void await message.reply("Choose a ban-list page from 1 to " + pages + ". Usage: s banlist [page].");
+      const lines = entries.slice((page - 1) * pageSize, page * pageSize).map(ban =>
         "**" + ban.user.username + "** (`" + ban.user.id + "`) — " + String(ban.reason || "No reason recorded").slice(0, 100)
       );
-      return void await message.reply("**Server ban list** — " + bans.size + " record(s) fetched. Showing up to 20:\n" + lines.join("\n").slice(0, 1700));
+      return void await message.reply("**Server ban list** — " + entries.length + " bans | Page " + page + "/" + pages + "\n" + lines.join("\n").slice(0, 1700));
     } catch (error) {
       return void await message.reply("Could not fetch the ban list. Check that I have the Ban Members permission.");
     }
@@ -313,15 +318,22 @@ export async function handleModerationCommand(message, args, store) {
       action: "warn", targetId: w.targetId, moderatorId: w.moderatorId,
       reason: w.reason, duration: "N/A", result: w.status || "active", createdAt: w.createdAt
     }));
-    const records = [...actions, ...warnings].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12);
-    if (!records.length) return void await message.reply("No stored moderation history was found for that member. History is recorded from the date this feature is installed.");
-    const lines = await Promise.all(records.map(async item =>
+    const records = [...actions, ...warnings].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    if (!records.length) return void await message.reply("No stored moderation history was found for that member. New moderation actions are recorded from this release onward; existing warning records are included.");
+    const pageSize = 10;
+    const pages = Math.ceil(records.length / pageSize);
+    const page = args[1] === undefined ? 1 : Number(args[1]);
+    if (!Number.isInteger(page) || page < 1 || page > pages) return void await message.reply("Choose a history page from 1 to " + pages + ". Usage: s modhistory @member [page].");
+    const pageRecords = records.slice((page - 1) * pageSize, page * pageSize);
+    const lines = await Promise.all(pageRecords.map(async item =>
       "**" + item.action.toUpperCase() + " — " + String(item.result).toUpperCase() + "**\nReason: " +
       String(item.reason || "No reason recorded").slice(0, 220) + "\nModerator: " +
       await getUserMention(guild, item.moderatorId) + "\nDate: " + item.createdAt +
       (item.duration && item.duration !== "N/A" ? "\nDuration: " + item.duration : "")
     ));
-    const embed = new EmbedBuilder().setTitle("Moderation history for " + targetLabel).setDescription(lines.join("\n\n").slice(0, 4000));
+    const embed = new EmbedBuilder().setTitle("Moderation history for " + targetLabel)
+      .setDescription(lines.join("\n\n").slice(0, 4000))
+      .setFooter({ text: "Page " + page + "/" + pages + " • " + records.length + " total records • s modhistory @member " + (page + 1) });
     return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
   }
 
