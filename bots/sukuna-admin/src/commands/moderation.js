@@ -236,7 +236,7 @@ export async function handleModerationCommand(message, args, store) {
         return { ...c, security: { ...c.security, raidWhitelistIds: value === "add" ? [...new Set([...list, id])] : list.filter(item => item !== id) } };
       });
       await logConfigChange(message, store, "Raid whitelist " + value + " member " + id + ".");
-      return void await message.reply("Raid whitelist updated for <@" + id + ">.", { allowedMentions: { parse: [] } });
+      return void await message.reply({ content: "Raid whitelist updated for <@" + id + ">.", allowedMentions: { parse: [] } });
     }
     return void await message.reply("Use s raid on|off|status, s raid threshold 10 30s, s raid action set alert, or s raid whitelist add|remove @member.");
   }
@@ -256,20 +256,20 @@ export async function handleModerationCommand(message, args, store) {
       if (!botMember?.permissions?.has(PermissionFlagsBits.KickMembers)) missing.push("Kick Members");
       if (!botMember?.permissions?.has(PermissionFlagsBits.ModerateMembers)) missing.push("Moderate Members");
       const report =
-        "**SUKUNA Security Status**\\n" +
+        "**SUKUNA Security Status**\n" +
         "AutoMod: " + (auto.enabled ? "ON" : "OFF") + " | action: " + auto.action +
         " | rate: " + auto.maxMessages + "/" + auto.intervalMs + "ms | duplicates: " + auto.duplicateLimit +
         " | links: " + (auto.blockLinks ? "ON" : "OFF") + " | invites: " + (auto.blockInvites ? "ON" : "OFF") +
         " | caps: " + (auto.blockCaps ? "ON" : "OFF") + " | mentions: " + (auto.blockMentions ? "ON" : "OFF") +
         " (limit " + auto.massMentionLimit + ") | blocked phrases: " + auto.blockedPhrases.length +
-        " | whitelist: " + auto.whitelistPhrases.length + " | ignored channels/roles: " + auto.ignoredChannelIds.length + "/" + auto.ignoredRoleIds.length + "\\n" +
+        " | whitelist: " + auto.whitelistPhrases.length + " | ignored channels/roles: " + auto.ignoredChannelIds.length + "/" + auto.ignoredRoleIds.length + "\n" +
         "Raid: " + (current.raidProtectionEnabled ? "ON" : "OFF") + " | threshold: " + current.raidJoinLimit +
         " joins/" + current.raidWindowMs + "ms | response: " + current.raidAction +
-        " | trusted members: " + current.raidWhitelistIds.length + " | cooldown: " + current.alertCooldownMs + "ms\\n" +
+        " | trusted members: " + current.raidWhitelistIds.length + " | cooldown: " + current.alertCooldownMs + "ms\n" +
         "Account-age alerts: " + (current.accountAgeAlertsEnabled ? "ON" : "OFF") +
-        " | threshold: " + current.minimumAccountAgeDays + " days\\n" +
+        " | threshold: " + current.minimumAccountAgeDays + " days\n" +
         "Suspicious accounts: " + (current.suspiciousAccountDetectionEnabled ? "ON" : "OFF") +
-        " | signals: below age threshold + default avatar | alert only\\n" +
+        " | signals: below age threshold + default avatar | alert only\n" +
         "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") +
         " | missing bot permissions: " + (missing.length ? missing.join(", ") : "none detected");
       return void await message.reply(report);
@@ -316,12 +316,12 @@ export async function handleModerationCommand(message, args, store) {
     const records = [...actions, ...warnings].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12);
     if (!records.length) return void await message.reply("No stored moderation history was found for that member. History is recorded from the date this feature is installed.");
     const lines = await Promise.all(records.map(async item =>
-      "**" + item.action.toUpperCase() + " — " + String(item.result).toUpperCase() + "**\\nReason: " +
-      String(item.reason || "No reason recorded").slice(0, 220) + "\\nModerator: " +
-      await getUserMention(guild, item.moderatorId) + "\\nDate: " + item.createdAt +
-      (item.duration && item.duration !== "N/A" ? "\\nDuration: " + item.duration : "")
+      "**" + item.action.toUpperCase() + " — " + String(item.result).toUpperCase() + "**\nReason: " +
+      String(item.reason || "No reason recorded").slice(0, 220) + "\nModerator: " +
+      await getUserMention(guild, item.moderatorId) + "\nDate: " + item.createdAt +
+      (item.duration && item.duration !== "N/A" ? "\nDuration: " + item.duration : "")
     ));
-    const embed = new EmbedBuilder().setTitle("Moderation history for " + targetLabel).setDescription(lines.join("\\n\\n").slice(0, 4000));
+    const embed = new EmbedBuilder().setTitle("Moderation history for " + targetLabel).setDescription(lines.join("\n\n").slice(0, 4000));
     return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
   }
 
