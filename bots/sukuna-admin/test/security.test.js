@@ -170,6 +170,7 @@ test("suspicious-account detection requires combined signals and only alerts", a
   resetSecurityMemoryForTests();
   const config = makeStore().getConfig(guildId);
   config.security.suspiciousAccountDetectionEnabled = true;
+  config.security.accountAgeAlertsEnabled = true;
   const member = {
     id: "22345678901234567",
     user: { createdTimestamp: Date.now() - 1000, avatar: null },
