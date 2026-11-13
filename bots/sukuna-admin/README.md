@@ -20,13 +20,13 @@ Independent Discord bot for server moderation, persistent warnings and moderatio
 - `s kick @member [reason]`
 - `s ban @member [reason]`
 - `s unban USER_ID [reason]`
-- `s banlist` (shows up to 20 of the first 1,000 bans returned)
+- `s banlist [page]` (20 bans per page, up to the first 1,000 returned by Discord)
 - `s timeout @member 10m [reason]` (1 second–28 days)
 - `s untimeout @member [reason]`
 - `s warn @member [reason]`
 - `s warnings @member` (active warnings only)
 - `s warninghistory @member` (active, cleared, and removed warnings)
-- `s modhistory @member` (stored moderation actions plus all warning records)
+- `s modhistory @member [page]` (10 records per page; stored moderation actions plus all warning records)
 - `s removewarn @member WARNING_NUMBER`
 - `s clearwarnings @member`
 
@@ -62,7 +62,7 @@ Moderation actions require their matching Discord permission. Ban-list access re
 
 Warnings store target ID, moderator ID, reason, timestamp, and a hidden unique record ID. Warnings remain after members leave. Clearing or removing warnings archives them rather than deleting them. Active warning numbering restarts after a clear; archived records remain visible in warning history.
 
-Moderation action history is stored per guild, capped at 1,000 entries to control storage growth. It records manual kick, ban, unban, timeout, untimeout, warning-removal, and warning-clear actions from the release that introduces this feature. Existing warning records are included. Discord does not provide a complete lifetime moderation history, so earlier kicks/bans/timeouts cannot be reconstructed automatically.
+Moderation action history is stored per guild and records manual kick, ban, unban, timeout, untimeout, warning-removal, and warning-clear actions from the release that introduces this feature. Only actual moderation actions are persisted; high-volume AutoMod and security alerts remain in logs without creating history-file writes. Existing warning records are included. Discord does not provide a complete lifetime moderation history, so earlier kicks/bans/timeouts cannot be reconstructed automatically.
 
 ## Security behavior
 
