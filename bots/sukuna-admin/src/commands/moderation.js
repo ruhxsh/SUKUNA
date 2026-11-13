@@ -154,6 +154,7 @@ export async function handleModerationCommand(message, args, store) {
     if (sub === "whitelist" && ["add", "remove"].includes(rest[0])) {
       const phrase = rest.slice(1).join(" ").trim().slice(0, 100);
       if (phrase.length < 2) return void await message.reply('Provide a word or phrase of at least 2 characters. Example: s automod whitelist add "approved phrase".');
+      if (rest[0] === "add" && !current.whitelistPhrases.some(item => item.toLowerCase() === phrase.toLowerCase()) && current.whitelistPhrases.length >= 100) return void await message.reply("The AutoMod whitelist is full (100 entries).");
       await store.updateConfig(guild.id, c => {
         const list = c.automod.whitelistPhrases;
         const exists = list.some(item => item.toLowerCase() === phrase.toLowerCase());
@@ -170,6 +171,7 @@ export async function handleModerationCommand(message, args, store) {
     if (sub === "block" && ["add", "remove"].includes(rest[0])) {
       const phrase = rest.slice(1).join(" ").trim().slice(0, 100);
       if (phrase.length < 2) return void await message.reply('Provide a phrase of at least 2 characters. Example: s automod block add "example phrase".');
+      if (rest[0] === "add" && !current.blockedPhrases.some(item => item.toLowerCase() === phrase.toLowerCase()) && current.blockedPhrases.length >= 100) return void await message.reply("The blocked-phrase list is full (100 entries).");
       await store.updateConfig(guild.id, c => {
         const list = c.automod.blockedPhrases;
         const exists = list.some(p => p.toLowerCase() === phrase.toLowerCase());
@@ -240,6 +242,10 @@ export async function handleModerationCommand(message, args, store) {
       const id = mentionIdFrom(args[2]);
       if (!id) return void await message.reply("Usage: s raid whitelist add|remove @member (or a Discord user ID).");
       const exists = current.raidWhitelistIds.includes(id);
+      if (value === "add" && !exists) {
+        const trustedMember = await guild.members.fetch(id).catch(() => null);
+        if (!trustedMember) return void await message.reply("Only current server members can be added to the raid whitelist.");
+      }
       if (value === "add" && !exists && current.raidWhitelistIds.length >= 100) return void await message.reply("The raid whitelist is full (100 members).");
       await store.updateConfig(guild.id, c => {
         const list = c.security.raidWhitelistIds;
@@ -282,7 +288,7 @@ export async function handleModerationCommand(message, args, store) {
         " | signals: below age threshold + default avatar | alert only\n" +
         "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") +
         " | missing bot permissions: " + (missing.length ? missing.join(", ") : "none detected") +
-        "\\nIgnored channels: " + summarizeIds(auto.ignoredChannelIds) + " | ignored roles: " + summarizeIds(auto.ignoredRoleIds);
+        "\nIgnored channels: " + summarizeIds(auto.ignoredChannelIds) + " | ignored roles: " + summarizeIds(auto.ignoredRoleIds);
       return void await message.reply(report);
     }
     if (sub === "suspicious" && ["on", "off"].includes(setting)) {
