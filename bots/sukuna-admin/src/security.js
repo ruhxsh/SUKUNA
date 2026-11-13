@@ -35,9 +35,11 @@ export async function handleAutomodMessage(message, store) {
   const state = messageWindows.get(key) || { times: [], recent: [] };
   prune(state.times, now - rules.intervalMs);
   state.times.push(now);
+  if (state.times.length > rules.maxMessages + 1) state.times.splice(0, state.times.length - rules.maxMessages - 1);
   const normalized = message.content.toLowerCase().replace(/\s+/g, " ").trim();
   state.recent = state.recent.filter(item => now - item.time <= rules.intervalMs);
   if (normalized) state.recent.push({ content: normalized, time: now });
+  if (state.recent.length > 100) state.recent.splice(0, state.recent.length - 100);
   setBounded(messageWindows, key, state);
 
   let violation = null;
@@ -102,6 +104,7 @@ export async function handleRaidJoin(member, store) {
   const joins = joinWindows.get(key) || [];
   prune(joins, now - rules.raidWindowMs);
   joins.push(now);
+  if (joins.length > 100) joins.splice(0, joins.length - 100);
   setBounded(joinWindows, key, joins);
   if (joins.length < rules.raidJoinLimit) return;
 
