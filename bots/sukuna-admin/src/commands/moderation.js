@@ -283,9 +283,10 @@ export async function handleModerationCommand(message, args, store) {
         " joins/" + current.raidWindowMs + "ms | response: " + current.raidAction +
         " | trusted members: " + current.raidWhitelistIds.length + " | cooldown: " + current.alertCooldownMs + "ms\n" +
         "Account-age alerts: " + (current.accountAgeAlertsEnabled ? "ON" : "OFF") +
-        " | threshold: " + current.minimumAccountAgeDays + " days\n" +
+        " | threshold: " + current.minimumAccountAgeDays + " days | response: alert only\n" +
         "Suspicious accounts: " + (current.suspiciousAccountDetectionEnabled ? "ON" : "OFF") +
         " | signals: below age threshold + default avatar | alert only\n" +
+        "Audit-log anomaly checks: " + (botMember?.permissions?.has(PermissionFlagsBits.ViewAuditLog) ? "READY" : "UNAVAILABLE (View Audit Log permission missing)") + " | checks kick/ban executor permissions\n" +
         "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") +
         " | missing bot permissions: " + (missing.length ? missing.join(", ") : "none detected") +
         "\nIgnored channels: " + summarizeIds(auto.ignoredChannelIds) + " | ignored roles: " + summarizeIds(auto.ignoredRoleIds);
