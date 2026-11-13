@@ -17,12 +17,19 @@ function isIgnored(message, config) {
   if (config.automod.ignoredChannelIds.includes(message.channelId)) return true;
   return message.member?.roles?.cache?.some(role => config.automod.ignoredRoleIds.includes(role.id)) || false;
 }
+function isExcessiveCaps(content) {
+  const letters = content.match(/[a-z]/gi) || [];
+  if (letters.length < 10) return false;
+  const uppercase = letters.filter(letter => letter === letter.toUpperCase()).length;
+  return uppercase / letters.length >= 0.7;
+}
 
 export async function handleAutomodMessage(message, store) {
-  if (!message.guild || message.author.bot || message.webhookId || !message.member) return;
+  if (!message.guild || message.author.bot || message.webhookId || !message.member) return false;
   const config = store.getConfig(message.guild.id);
   const rules = config.automod;
-  if (!rules.enabled || isIgnored(message, config)) return;
+  if (!rules.enabled || isIgnored(message, config)) return false;
+
   const now = Date.now();
   const key = message.guild.id + ":" + message.author.id;
   const state = messageWindows.get(key) || { times: [], recent: [] };
@@ -36,9 +43,17 @@ export async function handleAutomodMessage(message, store) {
   let violation = null;
   if (state.times.length > rules.maxMessages) violation = "Message rate exceeded configured limit";
   else if (normalized && state.recent.filter(item => item.content === normalized).length >= rules.duplicateLimit) violation = "Repeated message detected";
-  else if (message.mentions.everyone || message.mentions.users.size + message.mentions.roles.size >= rules.massMentionLimit) violation = "Mass mention limit exceeded";
+  else if (rules.blockMentions && (message.mentions.everyone || message.mentions.users.size + message.mentions.roles.size >= rules.massMentionLimit)) violation = "Mass mention limit exceeded";
   else if (normalized && rules.blockInvites && /(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)[a-z0-9-]+/i.test(normalized)) violation = "Unwanted Discord invite link detected";
-  else if (normalized && rules.blockedPhrases.some(phrase => normalized.includes(phrase.toLowerCase()))) violation = "Configured blocked phrase detected";
+  else if (normalized && rules.blockLinks && /(?:https?:\/\/|www\.)\S+/i.test(normalized)) violation = "Link blocking is enabled";
+  else if (normalized && rules.blockCaps && isExcessiveCaps(message.content)) violation = "Excessive uppercase message detected";
+  else if (normalized) {
+    const whitelist = new Set(rules.whitelistPhrases.map(phrase => phrase.toLowerCase()));
+    const blocked = rules.blockedPhrases.find(phrase =>
+      normalized.includes(phrase.toLowerCase()) && !whitelist.has(phrase.toLowerCase())
+    );
+    if (blocked) violation = "Configured blocked phrase detected: " + blocked;
+  }
   if (!violation) return false;
 
   let result = "alert";
@@ -61,17 +76,27 @@ export async function handleAutomodMessage(message, store) {
 export async function handleRaidJoin(member, store) {
   const config = store.getConfig(member.guild.id);
   const rules = config.security;
-  if (rules.accountAgeAlertsEnabled) {
-    const ageMs = Date.now() - member.user.createdTimestamp;
-    if (ageMs < rules.minimumAccountAgeDays * 86400000) {
-      await logModeration(member.client, store, member.guild, {
-        action: "new-account-alert", targetId: member.id, moderatorId: member.client.user.id,
-        reason: "Account age is below the configured " + rules.minimumAccountAgeDays + "-day threshold. This is an alert only.",
-        result: "alert"
-      });
-    }
+  const accountCreated = member.user?.createdTimestamp;
+  const accountAgeMs = Number.isFinite(accountCreated) ? Date.now() - accountCreated : null;
+  const belowAgeLimit = accountAgeMs !== null && accountAgeMs < rules.minimumAccountAgeDays * 86400000;
+
+  if (rules.accountAgeAlertsEnabled && belowAgeLimit) {
+    await logModeration(member.client, store, member.guild, {
+      action: "new-account-alert", targetId: member.id, moderatorId: member.client.user.id,
+      reason: "Account age is below the configured " + rules.minimumAccountAgeDays + "-day threshold. Alert only.",
+      result: "alert"
+    });
   }
-  if (!rules.raidProtectionEnabled) return;
+  if (rules.suspiciousAccountDetectionEnabled && belowAgeLimit && member.user?.avatar === null) {
+    await logModeration(member.client, store, member.guild, {
+      action: "suspicious-account-alert", targetId: member.id, moderatorId: member.client.user.id,
+      reason: "Combined signals: account is younger than " + rules.minimumAccountAgeDays +
+        " days and uses a default avatar. This is a review alert, not proof of abuse; no punishment was applied.",
+      result: "alert"
+    });
+  }
+
+  if (!rules.raidProtectionEnabled || rules.raidWhitelistIds.includes(member.id)) return;
   const now = Date.now();
   const key = member.guild.id;
   const joins = joinWindows.get(key) || [];
@@ -85,7 +110,8 @@ export async function handleRaidJoin(member, store) {
   setBounded(alertTimes, key, now);
   await logModeration(member.client, store, member.guild, {
     action: "raid-alert", targetId: member.id, moderatorId: member.client.user.id,
-    reason: joins.length + " joins within " + rules.raidWindowMs + "ms. No automatic punishment was applied.",
+    reason: joins.length + " non-whitelisted joins within " + rules.raidWindowMs +
+      "ms. Configured response: " + rules.raidAction + ". No automatic punishment was applied.",
     result: "alert"
   });
 }
