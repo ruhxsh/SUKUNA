@@ -70,9 +70,12 @@ export async function handleModerationCommand(message, args, store) {
     await message.reply("**SUKUNA — Administration & Security**\n" +
       "s kick @member [reason]\ns ban @member [reason]\ns unban USER_ID [reason]\n" +
       "s timeout @member 10m [reason]\ns untimeout @member [reason]\ns warn @member [reason]\n" +
-      "s warnings @member\ns warninghistory @member\ns removewarn @member WARNING_NUMBER\ns clearwarnings @member\n" +
-      "s setmodlog #channel\ns disablemodlog\ns automod on|off|status\n" +
-      "s automod block add|remove \"phrase\"\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\ns raid on|off|status\ns raid limit 10\ns security status\ns security account-age on|off\ns security account-age-days 7");
+      "s warnings @member\ns warninghistory @member\ns modhistory @member\ns removewarn @member WARNING_NUMBER\ns clearwarnings @member\n" +
+      "s banlist\ns setmodlog #channel\ns disablemodlog\ns modlog status\n" +
+      "s automod on|off|status\ns automod links|caps|mentions on|off\ns automod whitelist add|remove phrase\n" +
+      "s automod block add|remove \"phrase\"\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\n" +
+      "s raid on|off|status\ns raid threshold 10 30s\ns raid action set alert\ns raid whitelist add|remove @member\n" +
+      "s security status\ns security suspicious on|off\ns security account-age on|off\ns security account-age-days 7");
     return;
   }
 
