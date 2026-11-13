@@ -356,7 +356,7 @@ export async function handleModerationCommand(message, args, store) {
     ));
     const embed = new EmbedBuilder().setTitle("Moderation history for " + targetLabel)
       .setDescription(lines.join("\n\n").slice(0, 4000))
-      .setFooter({ text: "Page " + page + "/" + pages + " • " + records.length + " total records • s modhistory @member " + (page + 1) });
+      .setFooter({ text: "Page " + page + "/" + pages + " • " + records.length + " total records" + (page < pages ? " • Next: s modhistory @member " + (page + 1) : " • End of history") });
     return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
   }
 
