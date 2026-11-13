@@ -47,7 +47,7 @@ export async function handleAutomodMessage(message, store) {
   else if (normalized && state.recent.filter(item => item.content === normalized).length >= rules.duplicateLimit) violation = "Repeated message detected";
   else if (rules.blockMentions !== false && (message.mentions.everyone || message.mentions.users.size + message.mentions.roles.size >= rules.massMentionLimit)) violation = "Mass mention limit exceeded";
   else if (normalized && rules.blockInvites && /(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)[a-z0-9-]+/i.test(normalized)) violation = "Unwanted Discord invite link detected";
-  else if (normalized && rules.blockLinks && /(?:https?:\/\/|www\.)\S+/i.test(normalized)) violation = "Link blocking is enabled";
+  else if (normalized && rules.blockLinks && /(?:https?:\/\/|www\.)\S+|(?:^|\s)(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/i.test(normalized)) violation = "Link blocking is enabled";
   else if (normalized && rules.blockCaps && isExcessiveCaps(message.content)) violation = "Excessive uppercase message detected";
   else if (normalized) {
     const whitelist = new Set((rules.whitelistPhrases || []).map(phrase => phrase.toLowerCase()));
