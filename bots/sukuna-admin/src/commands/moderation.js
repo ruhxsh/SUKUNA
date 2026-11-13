@@ -244,12 +244,41 @@ export async function handleModerationCommand(message, args, store) {
   if (command === "security") {
     const [sub, setting, value] = args;
     const current = store.getConfig(guild.id).security;
-    if (sub === "status") return void await message.reply(
-      "Raid detection: " + (current.raidProtectionEnabled ? "ON" : "OFF") +
-      " | threshold: " + current.raidJoinLimit + "/" + current.raidWindowMs + "ms" +
-      " | new-account alerts: " + (current.accountAgeAlertsEnabled ? "ON" : "OFF") +
-      " | minimum account age: " + current.minimumAccountAgeDays + " days."
-    );
+    if (sub === "status") {
+      const auto = store.getConfig(guild.id).automod;
+      const logId = store.getConfig(guild.id).modLogChannelId;
+      const logChannel = logId ? await guild.channels.fetch(logId).catch(() => null) : null;
+      const logReady = Boolean(logChannel?.isTextBased() && logChannel.permissionsFor(botMember)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]));
+      const missing = [];
+      if (!botMember?.permissions?.has(PermissionFlagsBits.ViewAuditLog)) missing.push("View Audit Log");
+      if (!botMember?.permissions?.has(PermissionFlagsBits.ManageMessages)) missing.push("Manage Messages");
+      if (!botMember?.permissions?.has(PermissionFlagsBits.BanMembers)) missing.push("Ban Members");
+      if (!botMember?.permissions?.has(PermissionFlagsBits.KickMembers)) missing.push("Kick Members");
+      if (!botMember?.permissions?.has(PermissionFlagsBits.ModerateMembers)) missing.push("Moderate Members");
+      const report =
+        "**SUKUNA Security Status**\\n" +
+        "AutoMod: " + (auto.enabled ? "ON" : "OFF") + " | action: " + auto.action +
+        " | rate: " + auto.maxMessages + "/" + auto.intervalMs + "ms | duplicates: " + auto.duplicateLimit +
+        " | links: " + (auto.blockLinks ? "ON" : "OFF") + " | invites: " + (auto.blockInvites ? "ON" : "OFF") +
+        " | caps: " + (auto.blockCaps ? "ON" : "OFF") + " | mentions: " + (auto.blockMentions ? "ON" : "OFF") +
+        " (limit " + auto.massMentionLimit + ") | blocked phrases: " + auto.blockedPhrases.length +
+        " | whitelist: " + auto.whitelistPhrases.length + " | ignored channels/roles: " + auto.ignoredChannelIds.length + "/" + auto.ignoredRoleIds.length + "\\n" +
+        "Raid: " + (current.raidProtectionEnabled ? "ON" : "OFF") + " | threshold: " + current.raidJoinLimit +
+        " joins/" + current.raidWindowMs + "ms | response: " + current.raidAction +
+        " | trusted members: " + current.raidWhitelistIds.length + " | cooldown: " + current.alertCooldownMs + "ms\\n" +
+        "Account-age alerts: " + (current.accountAgeAlertsEnabled ? "ON" : "OFF") +
+        " | threshold: " + current.minimumAccountAgeDays + " days\\n" +
+        "Suspicious accounts: " + (current.suspiciousAccountDetectionEnabled ? "ON" : "OFF") +
+        " | signals: below age threshold + default avatar | alert only\\n" +
+        "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") +
+        " | missing bot permissions: " + (missing.length ? missing.join(", ") : "none detected");
+      return void await message.reply(report);
+    }
+    if (sub === "suspicious" && ["on", "off"].includes(setting)) {
+      await store.updateConfig(guild.id, c => ({ ...c, security: { ...c.security, suspiciousAccountDetectionEnabled: setting === "on" } }));
+      await logConfigChange(message, store, "Suspicious-account detection set to " + setting.toUpperCase() + ".");
+      return void await message.reply("Suspicious-account detection is now " + setting.toUpperCase() + ". It only alerts when an account is below the configured age threshold and has a default avatar. This is a review signal, not proof of abuse.");
+    }
     if (sub === "account-age" && ["on", "off"].includes(setting)) {
       await store.updateConfig(guild.id, c => ({ ...c, security: { ...c.security, accountAgeAlertsEnabled: setting === "on" } }));
       return void await message.reply("New-account age alerts are now " + setting.toUpperCase() + ". Alerts only; no automatic action.");
@@ -260,7 +289,7 @@ export async function handleModerationCommand(message, args, store) {
       await store.updateConfig(guild.id, c => ({ ...c, security: { ...c.security, minimumAccountAgeDays: days } }));
       return void await message.reply("New-account alert threshold set to " + days + " days.");
     }
-    return void await message.reply("Use s security status, s security account-age on|off, or s security account-age-days 7.");
+    return void await message.reply("Use s security status, s security suspicious on|off, s security account-age on|off, or s security account-age-days 7.");
   }
 
   if (command === "unban") {
