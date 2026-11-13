@@ -100,7 +100,7 @@ function normalizeState(value) {
     const moderationHistory = Array.isArray(guild.moderationHistory) ? guild.moderationHistory
       .filter(item => isObject(item) && snowflake(item.targetId) && snowflake(item.moderatorId) &&
         typeof item.action === "string" && typeof item.createdAt === "string" && !Number.isNaN(Date.parse(item.createdAt)))
-      .slice(-1000).map(item => ({
+      .map(item => ({
         id: typeof item.id === "string" ? item.id.slice(0, 80) : randomUUID(),
         targetId: item.targetId, moderatorId: item.moderatorId,
         action: item.action.slice(0, 80), reason: String(item.reason || "No reason supplied").slice(0, 500),
@@ -246,7 +246,6 @@ export class JsonStore {
         createdAt: createdAt || new Date().toISOString()
       };
       history.push(record);
-      if (history.length > 1000) history.splice(0, history.length - 1000);
       try { await this.persist(); }
       catch (error) { history.splice(history.findIndex(item => item.id === record.id), 1); throw error; }
       return true;
