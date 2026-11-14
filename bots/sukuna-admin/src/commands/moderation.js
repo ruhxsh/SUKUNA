@@ -125,7 +125,11 @@ export async function handleModerationCommand(message, args, store) {
     if (!channel?.isTextBased()) return void await message.reply("Deleted-message logging is configured, but its channel is missing or is not a text channel: <#" + channelId + ">.");
     const permissions = channel.permissionsFor(botMember);
     const ready = permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]);
-    return void await message.reply("Deleted-message logging is CONFIGURED for <#" + channelId + "> and is " + (ready ? "READY" : "NOT READY") + ". " + (ready ? "The bot can view the channel, send messages, and embed logs." : "Check View Channel, Send Messages, and Embed Links permissions."));
+    const auditReady = botMember?.permissions?.has(PermissionFlagsBits.ViewAuditLog);
+    return void await message.reply("Deleted-message logging is CONFIGURED for <#" + channelId + "> and is " + (ready ? "READY" : "NOT READY") + ". " +
+      (ready ? "The bot can send logs." : "Check View Channel, Send Messages, and Embed Links permissions.") +
+      " Moderator identification: " + (auditReady ? "available when Discord provides one unambiguous audit entry" : "unavailable until View Audit Log is granted") +
+      ". Self-deletions may still have an unknown actor because Discord does not expose them reliably.");
   }
 
   if (command === "modlog" && args[0]?.toLowerCase() === "status") {
