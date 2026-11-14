@@ -46,6 +46,7 @@ Independent Discord bot for server moderation, persistent warnings and moderatio
 - `s automod mentions on|off`
 - `s automod invites on|off`
 - `s automod block add|remove "phrase"`
+- `s automod staffrole add|remove @role` (explicit exemptions for staff roles without moderation permissions)
 - `s automod whitelist add|remove "phrase"`
 - `s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT`
 - `s automod ignore channel add|remove #channel`
@@ -69,7 +70,7 @@ Moderation action history is stored per guild and records manual kick, ban, unba
 
 ## Security behavior
 
-- **AutoMod:** message-rate limits, duplicate messages, mass mentions, optional Discord invite filtering, general link blocking, excessive-uppercase detection, blocked phrases, and a phrase whitelist. Every filter respects configured ignored channels and roles and the selected alert/delete action. A whitelist exempts only its matching blocked phrase; other checks still apply.
+- **AutoMod:** message-rate limits, duplicate messages, mass mentions, optional Discord invite filtering, general link blocking, excessive-uppercase detection, blocked phrases, and a phrase whitelist. Every filter respects configured ignored channels and roles and the selected alert/delete action. A whitelist exempts only its matching blocked phrase; other checks still apply. Blocked phrases use whole-word/whole-phrase matching with Unicode-aware boundaries and Arabic diacritic/tatweel normalization, avoiding matches inside unrelated words. The server owner and members with Administrator, Manage Server, Moderate Members, Manage Messages, Kick Members, or Ban Members permissions bypass blocked-phrase filtering only. Add custom staff roles (such as co-owner or moderator roles without those permissions) with `s automod staffrole add @role`; remove them with `s automod staffrole remove @role`. Staff exemptions do not bypass rate, link, mention, or other AutoMod checks.
 - **Raid detection:** counts non-whitelisted joins within the configured window and alerts staff. No automatic punishment or channel lockdown is performed.
 - **New-account alerts:** optionally alerts when an account is younger than the configured age threshold.
 - **Suspicious-account alerts:** only alerts when two signals occur together: account age is below the configured threshold and the account uses a default avatar. This is a review signal, not proof of abuse.
