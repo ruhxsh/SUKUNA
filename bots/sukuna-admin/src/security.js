@@ -61,6 +61,28 @@ function isExcessiveCaps(content) {
   return uppercase / letters.length >= 0.7;
 }
 
+async function sendBlockedLanguageNotice(message, store, deletionSucceeded) {
+  const channelId = store.getConfig(message.guild.id).automodLogChannelId;
+  if (!channelId) return;
+  const channel = await message.guild.channels.fetch(channelId).catch(() => null);
+  if (!channel?.isTextBased() || !channel.send) {
+    console.warn("AutoMod notification channel is missing or unavailable:", channelId);
+    return;
+  }
+  const displayName = message.member?.displayName || message.author.globalName || message.author.username;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const content = [
+    "**SUKUNA AutoMod — Blocked Language**",
+    "**Member:** " + displayName + " (@" + message.author.username + ", ID: " + message.author.id + ")",
+    "**Original channel:** <#" + message.channelId + ">",
+    "**Time:** <t:" + timestamp + ":F>",
+    "**Action:** " + (deletionSucceeded ? "Message deleted" : "Deletion failed — moderator review required"),
+    "**Reason:** A configured blocked word or phrase was detected."
+  ].join("\\n");
+  await channel.send({ content, allowedMentions: { parse: [] } }).catch(error => {
+    console.warn("Could not send AutoMod notification:", error.message);
+  });
+}
 export async function handleAutomodMessage(message, store) {
   if (!message.guild || message.author.bot || message.webhookId || !message.member) return false;
   const config = store.getConfig(message.guild.id);
@@ -91,20 +113,30 @@ export async function handleAutomodMessage(message, store) {
     const blocked = rules.blockedPhrases.find(phrase =>
       containsWholePhrase(normalized, phrase) && !whitelist.has(normalizeText(phrase))
     );
-    if (blocked) violation = "Configured blocked phrase detected: " + blocked;
+    if (blocked) violation = "Configured blocked phrase detected";
   }
+  const blockedLanguage = Boolean(normalized && !isAutomodStaff(message, rules) &&
+    rules.blockedPhrases.some(phrase => {
+      const normalizedPhrase = normalizeText(phrase);
+      return containsWholePhrase(normalized, phrase) &&
+        !(rules.whitelistPhrases || []).some(item => normalizeText(item) === normalizedPhrase);
+    }));
+  if (blockedLanguage) violation = "Configured blocked phrase detected";
   if (!violation) return false;
 
   let result = "alert";
-  if (rules.action === "delete") {
+  let deletionSucceeded = false;
+  if (blockedLanguage || rules.action === "delete") {
     try {
       await message.delete();
       result = "success";
+      deletionSucceeded = true;
     } catch (error) {
       result = "failed";
       console.warn("Automod could not delete violating message:", error.message);
     }
   }
+  if (blockedLanguage) await sendBlockedLanguageNotice(message, store, deletionSucceeded);
   await logModeration(message.client, store, message.guild, {
     action: "automod", targetId: message.author.id, moderatorId: message.client.user.id,
     reason: violation, result
