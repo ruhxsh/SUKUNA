@@ -5,6 +5,46 @@ const messageWindows = new Map();
 const joinWindows = new Map();
 const alertTimes = new Map();
 const MAX_TRACKED_KEYS = 20000;
+const STAFF_PERMISSIONS = [
+  PermissionFlagsBits.Administrator,
+  PermissionFlagsBits.ManageGuild,
+  PermissionFlagsBits.ModerateMembers,
+  PermissionFlagsBits.ManageMessages,
+  PermissionFlagsBits.KickMembers,
+  PermissionFlagsBits.BanMembers
+];
+
+function normalizeText(value) {
+  return String(value || "")
+    .normalize("NFKC")
+    .toLocaleLowerCase()
+    .replace(/[\u0640\u064B-\u065F\u0670\u06D6-\u06ED]/gu, "")
+    .replace(/\s+/gu, " ")
+    .trim();
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\const MAX_TRACKED_KEYS = 20000;
+
+function prune(items, cutoff) {");
+}
+
+function containsWholePhrase(content, phrase) {
+  const normalizedContent = normalizeText(content);
+  const normalizedPhrase = normalizeText(phrase);
+  if (!normalizedContent || !normalizedPhrase) return false;
+  const expression = normalizedPhrase.split(" ").map(escapeRegExp).join("\\s+");
+  const matcher = new RegExp("(?<![\\p{L}\\p{N}\\p{M}_])" + expression + "(?![\\p{L}\\p{N}\\p{M}_])", "u");
+  return matcher.test(normalizedContent);
+}
+
+function isAutomodStaff(message, rules) {
+  if (message.author.id === message.guild.ownerId) return true;
+  const permissions = message.member?.permissions;
+  if (permissions && STAFF_PERMISSIONS.some(permission => permissions.has(permission))) return true;
+  const staffRoleIds = rules.staffRoleIds || [];
+  return message.member?.roles?.cache?.some(role => staffRoleIds.includes(role.id)) || false;
+}
 
 function prune(items, cutoff) {
   while (items.length && items[0] < cutoff) items.shift();
@@ -36,7 +76,7 @@ export async function handleAutomodMessage(message, store) {
   prune(state.times, now - rules.intervalMs);
   state.times.push(now);
   if (state.times.length > rules.maxMessages + 1) state.times.splice(0, state.times.length - rules.maxMessages - 1);
-  const normalized = message.content.toLowerCase().replace(/\s+/g, " ").trim();
+  const normalized = normalizeText(message.content);
   state.recent = state.recent.filter(item => now - item.time <= rules.intervalMs);
   if (normalized) state.recent.push({ content: normalized, time: now });
   if (state.recent.length > 100) state.recent.splice(0, state.recent.length - 100);
@@ -49,10 +89,10 @@ export async function handleAutomodMessage(message, store) {
   else if (normalized && rules.blockInvites && /(?:discord\.gg\/|discord(?:app)?\.com\/invite\/)[a-z0-9-]+/i.test(normalized)) violation = "Unwanted Discord invite link detected";
   else if (normalized && rules.blockLinks && /(?:https?:\/\/|www\.)\S+|(?:^|\s)(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/\S*)?/i.test(normalized)) violation = "Link blocking is enabled";
   else if (normalized && rules.blockCaps && isExcessiveCaps(message.content)) violation = "Excessive uppercase message detected";
-  else if (normalized) {
-    const whitelist = new Set((rules.whitelistPhrases || []).map(phrase => phrase.toLowerCase()));
+  else if (normalized && !isAutomodStaff(message, rules)) {
+    const whitelist = new Set((rules.whitelistPhrases || []).map(normalizeText));
     const blocked = rules.blockedPhrases.find(phrase =>
-      normalized.includes(phrase.toLowerCase()) && !whitelist.has(phrase.toLowerCase())
+      containsWholePhrase(normalized, phrase) && !whitelist.has(normalizeText(phrase))
     );
     if (blocked) violation = "Configured blocked phrase detected: " + blocked;
   }
