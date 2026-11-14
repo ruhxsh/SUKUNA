@@ -207,7 +207,7 @@ export async function handleModerationCommand(message, args, store) {
     if (sub === "block" && ["add", "remove"].includes(rest[0])) {
       const phrase = rest.slice(1).join(" ").trim().slice(0, 100);
       if (phrase.length < 2) return void await message.reply('Provide a phrase of at least 2 characters. Example: s automod block add "example phrase".');
-      if (rest[0] === "add" && !current.blockedPhrases.some(item => item.toLowerCase() === phrase.toLowerCase()) && current.blockedPhrases.length >= 100) return void await message.reply("The blocked-phrase list is full (100 entries).");
+
       await store.updateConfig(guild.id, c => {
         const list = c.automod.blockedPhrases;
         const exists = list.some(p => p.toLowerCase() === phrase.toLowerCase());
