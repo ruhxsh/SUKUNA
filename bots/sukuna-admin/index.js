@@ -32,15 +32,22 @@ client.on("messageCreate", async message => {
   if (!message.guild || message.author.bot) return;
   try {
     cacheMessage(message, store);
-    if (await handleAutomodMessage(message, store)) return;
     const content = message.content.trim();
-    if (content.slice(0, PREFIX.length).toLowerCase() !== PREFIX) return;
-    if (content.length > PREFIX.length && !/\s/.test(content[PREFIX.length])) return;
-    const remainder = content.slice(PREFIX.length).trim();
-    if (!remainder) return;
-    const args = remainder.match(/"[^"]*"|'[^']*'|\S+/g) || [];
-    for (let i = 0; i < args.length; i++) args[i] = args[i].replace(/^["']|["']$/g, "");
-    await handleModerationCommand(message, args, store);
+    const isPrefixCommand = content.slice(0, PREFIX.length).toLowerCase() === PREFIX &&
+      (content.length === PREFIX.length || /\\s/.test(content[PREFIX.length]));
+    if (isPrefixCommand) {
+      const remainder = content.slice(PREFIX.length).trim();
+      const args = remainder.match(/"[^"]*"|'[^']*'|\\S+/g) || [];
+      for (let i = 0; i < args.length; i++) args[i] = args[i].replace(/^["']|["']$/g, "");
+      const rootCommand = (args[0] || "").toLowerCase();
+      const knownCommands = ["help", "modhelp", "kick", "ban", "unban", "banlist", "timeout", "untimeout", "warn", "warnings", "warninghistory", "modhistory", "removewarn", "clearwarnings", "setmodlog", "disablemodlog", "modlog", "setdeletelog", "disabledeletelog", "deletelog", "setautomodlog", "disableautomodlog", "automodlog", "automod", "raid", "security"];
+      if (knownCommands.includes(rootCommand)) {
+        args.shift();
+        await handleModerationCommand(message, args, store);
+        return;
+      }
+    }
+    await handleAutomodMessage(message, store);
   } catch (error) {
     console.error("Message processing failed:", error);
     if (message.channel?.send) await message.reply("An unexpected error occurred while processing that message.").catch(() => {});
