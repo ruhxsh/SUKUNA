@@ -19,6 +19,7 @@ export const DEFAULT_CONFIG = Object.freeze({
     duplicateLimit: 4,
     massMentionLimit: 5,
     blockedPhrases: [],
+    staffRoleIds: [],
     ignoredChannelIds: [],
     ignoredRoleIds: []
   },
