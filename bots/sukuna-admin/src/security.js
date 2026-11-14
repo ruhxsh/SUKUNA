@@ -78,7 +78,7 @@ async function sendBlockedLanguageNotice(message, store, deletionSucceeded) {
     "**Time:** <t:" + timestamp + ":F>",
     "**Action:** " + (deletionSucceeded ? "Message deleted" : "Deletion failed — moderator review required"),
     "**Reason:** A configured blocked word or phrase was detected."
-  ].join("\\n");
+  ].join("\n");
   await channel.send({ content, allowedMentions: { parse: [] } }).catch(error => {
     console.warn("Could not send AutoMod notification:", error.message);
   });
