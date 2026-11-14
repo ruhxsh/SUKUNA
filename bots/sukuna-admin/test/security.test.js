@@ -18,7 +18,7 @@ function makeStore(overrides = {}) {
     automod: {
       enabled: true, action: "delete", blockInvites: false, blockLinks: false, blockCaps: false,
       blockMentions: true, whitelistPhrases: [], maxMessages: 20, intervalMs: 7000,
-      duplicateLimit: 2, massMentionLimit: 3, blockedPhrases: [],
+      duplicateLimit: 2, massMentionLimit: 3, blockedPhrases: [], staffRoleIds: [],
       ignoredChannelIds: [], ignoredRoleIds: []
     },
     security: {
@@ -31,12 +31,15 @@ function makeStore(overrides = {}) {
   };
   return { getConfig: () => structuredClone(config) };
 }
-function makeMessage({content="hello", authorId="22345678901234567", bot=false, roles=[], everyone=false, users=0, roleMentions=0, channelId="32345678901234567"}={}) {
+function makeMessage({content="hello", authorId="22345678901234567", bot=false, roles=[], permissions=[], ownerId="92345678901234567", everyone=false, users=0, roleMentions=0, channelId="32345678901234567"}={}) {
   let deleted = false;
   const message = {
-    guild: { id: guildId }, guildId, channelId,
+    guild: { id: guildId, ownerId }, guildId, channelId,
     author: { id: authorId, bot }, webhookId: null, content,
-    member: { roles: { cache: { some: fn => roles.some(fn) } } },
+    member: {
+      permissions: { has: permission => permissions.includes(permission) },
+      roles: { cache: { some: fn => roles.some(id => fn({ id })) } }
+    },
     mentions: { everyone, users: { size: users }, roles: { size: roleMentions } },
     client: { user: { id: "42345678901234567" } },
     delete: async () => { deleted = true; },
@@ -236,4 +239,59 @@ test("audit-log detector only flags kick/ban actors missing the matching permiss
     console.log = original;
   }
   assert.equal(logged, true);
+});
+
+test("blocked phrases match whole words, not substrings inside Arabic words", async () => {
+  resetSecurityMemoryForTests();
+  const config = makeStore().getConfig(guildId);
+  config.automod.blockedPhrases = ["زب"];
+  const store = { getConfig: () => config };
+
+  const harmless = makeMessage({ content: "بزط" });
+  await handleAutomodMessage(harmless, store);
+  assert.equal(harmless.wasDeleted(), false);
+
+  resetSecurityMemoryForTests();
+  const exactWord = makeMessage({ content: "هذا زب هنا" });
+  await handleAutomodMessage(exactWord, store);
+  assert.equal(exactWord.wasDeleted(), true);
+});
+
+test("owners and staff permissions bypass blocked phrases but not other AutoMod rules", async () => {
+  resetSecurityMemoryForTests();
+  const config = makeStore().getConfig(guildId);
+  config.automod.blockedPhrases = ["blockedword"];
+  config.automod.massMentionLimit = 2;
+  const store = { getConfig: () => config };
+
+  const owner = makeMessage({ content: "blockedword", ownerId: "22345678901234567" });
+  await handleAutomodMessage(owner, store);
+  assert.equal(owner.wasDeleted(), false);
+
+  resetSecurityMemoryForTests();
+  const moderator = makeMessage({
+    content: "blockedword",
+    permissions: [PermissionFlagsBits.ModerateMembers]
+  });
+  await handleAutomodMessage(moderator, store);
+  assert.equal(moderator.wasDeleted(), false);
+
+  resetSecurityMemoryForTests();
+  const moderatorWithOtherViolation = makeMessage({
+    content: "blockedword",
+    permissions: [PermissionFlagsBits.ManageMessages],
+    everyone: true
+  });
+  await handleAutomodMessage(moderatorWithOtherViolation, store);
+  assert.equal(moderatorWithOtherViolation.wasDeleted(), true);
+});
+
+test("configured co-owner or staff roles bypass blocked phrases", async () => {
+  resetSecurityMemoryForTests();
+  const config = makeStore().getConfig(guildId);
+  config.automod.blockedPhrases = ["blockedword"];
+  config.automod.staffRoleIds = ["52345678901234567"];
+  const message = makeMessage({ content: "blockedword", roles: ["52345678901234567"] });
+  await handleAutomodMessage(message, { getConfig: () => config });
+  assert.equal(message.wasDeleted(), false);
 });
