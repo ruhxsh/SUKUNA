@@ -60,7 +60,7 @@ export async function handleModerationCommand(message, args, store) {
   const permission = command === "kick" ? PermissionFlagsBits.KickMembers
     : ["ban", "unban", "banlist"].includes(command) ? PermissionFlagsBits.BanMembers
     : ["timeout", "untimeout", "warn", "warnings", "warninghistory", "modhistory"].includes(command) ? PermissionFlagsBits.ModerateMembers
-    : ["setmodlog", "disablemodlog", "modlog", "clearwarnings", "removewarn", "automod", "raid", "security"].includes(command) ? PermissionFlagsBits.ManageGuild
+    : ["setmodlog", "disablemodlog", "modlog", "setdeletelog", "disabledeletelog", "deletelog", "clearwarnings", "removewarn", "automod", "raid", "security"].includes(command) ? PermissionFlagsBits.ManageGuild
     : null;
 
   if (permission && !hasModeratorPermission(member, permission)) {
@@ -75,6 +75,7 @@ export async function handleModerationCommand(message, args, store) {
       "s timeout @member 10m [reason]\ns untimeout @member [reason]\ns warn @member [reason]\n" +
       "s warnings @member\ns warninghistory @member\ns modhistory @member\ns removewarn @member WARNING_NUMBER\ns clearwarnings @member\n" +
       "s banlist\ns setmodlog #channel\ns disablemodlog\ns modlog status\n" +
+      "s setdeletelog #channel\ns disabledeletelog\ns deletelog status\n" +
       "s automod on|off|status\ns automod links|caps|mentions on|off\ns automod whitelist add|remove phrase\n" +
       "s automod block add|remove \"phrase\"\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\n" +
       "s raid on|off|status\ns raid threshold 10 30s\ns raid action set alert\ns raid whitelist add|remove @member\n" +
@@ -99,6 +100,32 @@ export async function handleModerationCommand(message, args, store) {
     await logConfigChange(message, store, "Discord moderation-log channel disabled; console logging remains active.");
     await message.reply("Channel logging disabled. Console logging remains enabled.");
     return;
+  }
+
+  if (command === "setdeletelog") {
+    const channel = message.mentions.channels.first();
+    if (!channel?.isTextBased() || !channel.send || channel.guild?.id !== guild.id) return void await message.reply("Mention a text channel in this server: s setdeletelog #deleted-messages.");
+    const channelPermissions = channel.permissionsFor(botMember);
+    if (!channelPermissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks])) {
+      return void await message.reply("I need View Channel, Send Messages, and Embed Links in that channel before it can receive deleted-message logs.");
+    }
+    await store.updateConfig(guild.id, config => ({ ...config, deletedMessageLogChannelId: channel.id }));
+    await logConfigChange(message, store, "Deleted-message log destination set to channel " + channel.id + ".");
+    return void await message.reply("Deleted-message logging is configured for <#" + channel.id + ">.");
+  }
+  if (command === "disabledeletelog") {
+    await store.updateConfig(guild.id, config => ({ ...config, deletedMessageLogChannelId: null }));
+    await logConfigChange(message, store, "Deleted-message logging disabled.");
+    return void await message.reply("Deleted-message logging is disabled.");
+  }
+  if (command === "deletelog" && args[0]?.toLowerCase() === "status") {
+    const channelId = store.getConfig(guild.id).deletedMessageLogChannelId;
+    if (!channelId) return void await message.reply("Deleted-message logging is DISABLED. No destination channel is configured.");
+    const channel = await guild.channels.fetch(channelId).catch(() => null);
+    if (!channel?.isTextBased()) return void await message.reply("Deleted-message logging is configured, but its channel is missing or is not a text channel: <#" + channelId + ">.");
+    const permissions = channel.permissionsFor(botMember);
+    const ready = permissions?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]);
+    return void await message.reply("Deleted-message logging is CONFIGURED for <#" + channelId + "> and is " + (ready ? "READY" : "NOT READY") + ". " + (ready ? "The bot can view the channel, send messages, and embed logs." : "Check View Channel, Send Messages, and Embed Links permissions."));
   }
 
   if (command === "modlog" && args[0]?.toLowerCase() === "status") {
