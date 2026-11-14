@@ -329,7 +329,7 @@ export async function handleModerationCommand(message, args, store) {
         "Suspicious accounts: " + (current.suspiciousAccountDetectionEnabled ? "ON" : "OFF") +
         " | signals: below age threshold + default avatar | alert only\n" +
         "Audit-log anomaly checks: " + (botMember?.permissions?.has(PermissionFlagsBits.ViewAuditLog) ? "READY" : "UNAVAILABLE (View Audit Log permission missing)") + " | checks kick/ban executor permissions\n" +
-        "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") + "\\n" +
+        "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") + "\n" +
         "Deleted-message logs: " + (deletedLogId ? (deletedLogReady ? "READY in <#" + deletedLogId + ">" : "CONFIGURED BUT NOT READY (<#" + deletedLogId + ">)") : "DISABLED") +
         " | content cache: in-memory only, 15 minutes / 5,000 recent messages" +
         " | missing bot permissions: " + (missing.length ? missing.join(", ") : "none detected") +
