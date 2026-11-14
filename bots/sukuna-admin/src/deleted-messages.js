@@ -25,7 +25,16 @@ function snapshot(message) {
 export function cacheMessage(message) {
   if (!message?.guildId && !message?.guild?.id) return;
   if (!message.id || message.author?.bot) return;
+  const previous = recentMessages.get(message.id);
+  if (!message.author && !previous) return;
   const item = snapshot(message);
+  if (previous) {
+    if (!item.authorId) item.authorId = previous.authorId;
+    if (item.authorName === "Unknown author") item.authorName = previous.authorName;
+    if (message.partial && !item.content) item.content = previous.content;
+    if (!item.attachments.length) item.attachments = previous.attachments;
+    if (!item.createdAt) item.createdAt = previous.createdAt;
+  }
   if (!item.guildId || !item.channelId) return;
   recentMessages.delete(item.id);
   recentMessages.set(item.id, item);
