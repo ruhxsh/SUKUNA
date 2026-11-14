@@ -92,7 +92,7 @@ export async function handleDeletedMessage(message, store, options = {}) {
 
   const config = store.getConfig(guildId);
   const logChannelId = config.deletedMessageLogChannelId;
-  if (!logChannelId || logChannelId === channelId) {
+  if (!logChannelId) {
     recentMessages.delete(messageId);
     return;
   }
