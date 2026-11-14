@@ -97,11 +97,26 @@ test("legacy version 2 data gains new defaults without losing warnings", async (
     const store = await new JsonStore(file).init();
     const config = store.getConfig(ids.guildId);
     assert.equal(config.modLogChannelId, "52345678901234567");
+    assert.equal(config.deletedMessageLogChannelId, null);
     assert.equal(config.automod.blockMentions, true);
     assert.deepEqual(config.automod.whitelistPhrases, []);
     assert.equal(config.security.raidAction, "alert");
     assert.equal(store.getWarnings(ids.guildId, ids.targetId)[0].reason, "Keep me");
     assert.deepEqual(store.getModerationHistory(ids.guildId, ids.targetId), []);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
+test("deleted-message log destination persists and validates Discord channel IDs", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  const file = path.join(directory, "store.json");
+  try {
+    const store = await new JsonStore(file).init();
+    await store.updateConfig(ids.guildId, config => ({ ...config, deletedMessageLogChannelId: "62345678901234567" }));
+    assert.equal(store.getConfig(ids.guildId).deletedMessageLogChannelId, "62345678901234567");
+    await store.updateConfig(ids.guildId, config => ({ ...config, deletedMessageLogChannelId: "not-a-channel" }));
+    assert.equal(store.getConfig(ids.guildId).deletedMessageLogChannelId, null);
+    const reloaded = await new JsonStore(file).init();
+    assert.equal(reloaded.getConfig(ids.guildId).deletedMessageLogChannelId, null);
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
 
