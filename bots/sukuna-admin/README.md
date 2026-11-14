@@ -8,7 +8,7 @@ Independent Discord bot for server moderation, persistent warnings and moderatio
 - A dedicated Discord application and bot token. Do not reuse another SUKUNA bot's token.
 - Persistent host storage; run one process per data directory.
 - Enable **Message Content Intent** and **Server Members Intent** in the Developer Portal.
-- Bot permissions: View Channels, Send Messages, Embed Links, Manage Messages, Kick Members, Ban Members, Moderate Members, and View Audit Log.
+- Bot permissions: View Channels, Send Messages, Embed Links, Manage Messages, Kick Members, Ban Members, Moderate Members, and View Audit Log. The deleted-message log channel also needs View Channel, Send Messages, and Embed Links.
 - Do not grant Administrator. Keep the bot role above members it must moderate and below trusted staff roles.
 - Set `DISCORD_TOKEN` and `BOT_DATA_DIR` in the host environment. Never commit a token.
 - Set the startup directory to `bots/sukuna-admin`, then run `npm install`, `npm run check`, `npm test`, and `npm start`.
@@ -34,6 +34,9 @@ Independent Discord bot for server moderation, persistent warnings and moderatio
 - `s setmodlog #channel`
 - `s disablemodlog`
 - `s modlog status`
+- `s setdeletelog #channel`
+- `s disabledeletelog`
+- `s deletelog status`
 
 ### AutoMod
 - `s automod on|off|status`
@@ -72,6 +75,7 @@ Moderation action history is stored per guild and records manual kick, ban, unba
 - **Suspicious-account alerts:** only alerts when two signals occur together: account age is below the configured threshold and the account uses a default avatar. This is a review signal, not proof of abuse.
 - **Audit-log anomaly alerts:** alerts when a recorded member kick/ban executor lacks the matching Discord permission. This is not a complete authorization engine and does not undo actions.
 - **Moderation logs:** console logging is always active; a configured Discord channel receives embeds when available. `s modlog status` checks the channel and required send/embed permissions.
+- **Deleted-message logs:** a separately configured channel receives the cached message text, author, original channel, attachments, message/deletion timestamps, and the moderator when a unique matching Discord message-delete audit entry exists. Configure with `s setdeletelog #channel`, inspect with `s deletelog status`, and disable with `s disabledeletelog`. Recent message snapshots are kept in memory only, capped at 5,000 messages and 15 minutes; deleted content is not written to the database. If the message was not cached (for example, it predates startup, cache eviction, or the bot was offline), Discord cannot provide the deleted text afterward. Discord audit logs do not reliably identify self-deletions and may be ambiguous for bulk or closely spaced deletions; in those cases the log explicitly reports the deleter as unknown instead of guessing. Attachment URLs are logged when available. Restrict access to the destination channel because it can contain deleted user content.
 - New security controls are disabled by default. AutoMod itself is off by default. Raid and suspicious-account detection are opt-in. Raid response is alert-only.
 
 ## Storage and reliability
