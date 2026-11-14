@@ -141,12 +141,12 @@ export async function handleDeletedMessage(message, store, options = {}) {
     .setTitle("Message Deleted")
     .setColor(0xe67e22)
     .addFields(
-      { name: "Author", value: author.slice(0, 1024), inline: true },
-      { name: "Deleted by", value: deleter.slice(0, 1024), inline: true },
-      { name: "Channel", value: "<#" + channelId + "> (ID: " + channelId + ")", inline: false },
+      { name: "Author", value: author.slice(0, 256), inline: true },
+      { name: "Deleted by", value: deleter.slice(0, 256), inline: true },
+      { name: "Channel", value: ("<#" + channelId + "> (ID: " + channelId + ")").slice(0, 256), inline: false },
       { name: "Attachments", value: attachmentSummary(attachments).slice(0, 800), inline: false },
-      { name: "Message time", value: record?.createdAt || message.createdAt?.toISOString?.() || "Unavailable", inline: true },
-      { name: "Deleted time", value: new Date().toISOString(), inline: true }
+      { name: "Message time", value: (record?.createdAt || message.createdAt?.toISOString?.() || "Unavailable").slice(0, 128), inline: true },
+      { name: "Deleted time", value: new Date().toISOString().slice(0, 128), inline: true }
     )
     .setDescription((content || unavailable).slice(0, 3500))
     .setFooter({ text: "Message ID: " + messageId + (content.length > 3500 ? " • Content shortened to fit Discord's embed limit" : "") });
