@@ -24,11 +24,8 @@ function normalizeText(value) {
 }
 
 function escapeRegExp(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\const MAX_TRACKED_KEYS = 20000;
-
-function prune(items, cutoff) {");
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
-
 function containsWholePhrase(content, phrase) {
   const normalizedContent = normalizeText(content);
   const normalizedPhrase = normalizeText(phrase);
