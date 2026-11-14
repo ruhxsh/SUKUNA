@@ -70,7 +70,7 @@ test("deleted message log preserves cached content and identifies a unique moder
   assert.equal(env.sent.length, 1);
   const embed = env.sent[0].embeds[0].data;
   assert.equal(embed.title, "Message Deleted");
-  assert.match(embed.fields.find(field => field.name === "Original message").value, /The exact deleted text/);
+  assert.match(embed.description, /The exact deleted text/);
   assert.match(embed.fields.find(field => field.name === "Author").value, /Original Author/);
   assert.match(embed.fields.find(field => field.name === "Deleted by").value, /Moderator/);
   assert.match(embed.fields.find(field => field.name === "Channel").value, new RegExp(ids.channel));
@@ -97,7 +97,7 @@ test("uncached partial messages are clearly marked instead of inventing content"
   resetDeletedMessageCacheForTests();
   const env = makeEnvironment();
   await handleDeletedMessage(makeMessage(env.guild, { partial: true }), env.store, { waitMs: 0 });
-  const content = env.sent[0].embeds[0].data.fields.find(field => field.name === "Original message").value;
+  const content = env.sent[0].embeds[0].data.description;
   assert.match(content, /not cached by SUKUNA/);
 });
 
