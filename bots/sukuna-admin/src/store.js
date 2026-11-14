@@ -20,6 +20,7 @@ function normalizeConfig(input) {
   return {
     modLogChannelId: snowflake(config.modLogChannelId) ? config.modLogChannelId : null,
     deletedMessageLogChannelId: snowflake(config.deletedMessageLogChannelId) ? config.deletedMessageLogChannelId : null,
+    automodLogChannelId: snowflake(config.automodLogChannelId) ? config.automodLogChannelId : null,
     automod: {
       enabled: automod.enabled === true,
       action: ["alert", "delete"].includes(automod.action) ? automod.action : DEFAULT_CONFIG.automod.action,
