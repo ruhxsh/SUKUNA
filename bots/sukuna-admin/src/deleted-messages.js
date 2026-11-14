@@ -22,9 +22,11 @@ function snapshot(message) {
   };
 }
 
-export function cacheMessage(message) {
+export function cacheMessage(message, store) {
   if (!message?.guildId && !message?.guild?.id) return;
   if (!message.id || message.author?.bot) return;
+  const guildId = message.guildId || message.guild?.id;
+  if (!store?.getConfig?.(guildId)?.deletedMessageLogChannelId) return;
   const previous = recentMessages.get(message.id);
   if (!message.author && !previous) return;
   const item = snapshot(message);
@@ -49,7 +51,7 @@ export function resetDeletedMessageCacheForTests() {
   recentMessages.clear();
 }
 
-async function identifyDeleter(message, record, waitMs = 700) {
+async function identifyDeleter(message, record, waitMs = 700, expectedCount = 1) {
   const guild = message.guild || message.client?.guilds?.cache?.get(message.guildId);
   const authorId = record?.authorId || message.author?.id;
   const channelId = message.channelId || message.channel?.id || record?.channelId;
@@ -64,7 +66,7 @@ async function identifyDeleter(message, record, waitMs = 700) {
     const matches = [...logs.entries.values()].filter(entry =>
       entry.targetId === authorId &&
       entry.extra?.channel?.id === channelId &&
-      entry.extra?.count === 1 &&
+      entry.extra?.count === expectedCount &&
       now - entry.createdTimestamp >= 0 &&
       now - entry.createdTimestamp <= 10000 &&
       entry.executorId
@@ -121,7 +123,7 @@ export async function handleDeletedMessage(message, store, options = {}) {
     return;
   }
 
-  const deleter = await identifyDeleter(message, record, options.waitMs ?? 700);
+  const deleter = await identifyDeleter(message, record, options.waitMs ?? 700, options.bulkCount ?? 1);
   const author = record
     ? record.authorName + (record.authorId ? " (<@" + record.authorId + ">)" : "")
     : message.author?.username || "Unknown author";
@@ -142,16 +144,24 @@ export async function handleDeletedMessage(message, store, options = {}) {
       { name: "Author", value: author.slice(0, 1024), inline: true },
       { name: "Deleted by", value: deleter.slice(0, 1024), inline: true },
       { name: "Channel", value: "<#" + channelId + "> (ID: " + channelId + ")", inline: false },
-      { name: "Original message", value: (content || unavailable).slice(0, 3900), inline: false },
-      { name: "Attachments", value: attachmentSummary(attachments), inline: false },
+      { name: "Attachments", value: attachmentSummary(attachments).slice(0, 800), inline: false },
       { name: "Message time", value: record?.createdAt || message.createdAt?.toISOString?.() || "Unavailable", inline: true },
       { name: "Deleted time", value: new Date().toISOString(), inline: true }
     )
-    .setFooter({ text: "Message ID: " + messageId + (content.length > 3900 ? " • Content shortened to fit Discord's embed limit" : "") });
+    .setDescription((content || unavailable).slice(0, 3500))
+    .setFooter({ text: "Message ID: " + messageId + (content.length > 3500 ? " • Content shortened to fit Discord's embed limit" : "") });
 
   try {
     await logChannel.send({ embeds: [embed], allowedMentions: { parse: [] } });
   } catch (error) {
     console.error("Could not send deleted-message log:", error.message);
+  }
+}
+
+export async function handleBulkDeletedMessages(messages, store) {
+  const list = [...messages.values()];
+  if (!list.length) return;
+  for (const message of list) {
+    await handleDeletedMessage(message, store, { bulkCount: list.length });
   }
 }
