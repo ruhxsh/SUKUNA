@@ -33,6 +33,7 @@ function normalizeConfig(input) {
       duplicateLimit: Number.isInteger(automod.duplicateLimit) ? Math.min(10, Math.max(2, automod.duplicateLimit)) : DEFAULT_CONFIG.automod.duplicateLimit,
       massMentionLimit: Number.isInteger(automod.massMentionLimit) ? Math.min(50, Math.max(2, automod.massMentionLimit)) : DEFAULT_CONFIG.automod.massMentionLimit,
       blockedPhrases: phrases,
+      staffRoleIds: ids(automod.staffRoleIds),
       ignoredChannelIds: ids(automod.ignoredChannelIds),
       ignoredRoleIds: ids(automod.ignoredRoleIds)
     },
