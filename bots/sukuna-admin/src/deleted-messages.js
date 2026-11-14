@@ -123,7 +123,7 @@ export async function handleDeletedMessage(message, store, options = {}) {
     return;
   }
 
-  const deleter = await identifyDeleter(message, record, options.waitMs ?? 700, options.bulkCount ?? 1);
+  const deleter = options.deleter || await identifyDeleter(message, record, options.waitMs ?? 700, options.bulkCount ?? 1);
   const author = record
     ? record.authorName + (record.authorId ? " (<@" + record.authorId + ">)" : "")
     : message.author?.username || "Unknown author";
@@ -159,9 +159,22 @@ export async function handleDeletedMessage(message, store, options = {}) {
 }
 
 export async function handleBulkDeletedMessages(messages, store) {
-  const list = [...messages.values()];
-  if (!list.length) return;
-  for (const message of list) {
-    await handleDeletedMessage(message, store, { bulkCount: list.length });
+  const groups = new Map();
+  for (const message of messages.values()) {
+    const record = recentMessages.get(message.id) || (!message.partial ? snapshot(message) : null);
+    const guildId = message.guildId || message.guild?.id;
+    if (!store.getConfig(guildId).deletedMessageLogChannelId) continue;
+    const authorId = record?.authorId || message.author?.id || "unknown";
+    const channelId = message.channelId || message.channel?.id || record?.channelId || "unknown";
+    const key = guildId + ":" + channelId + ":" + authorId;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ message, record });
+  }
+  for (const group of groups.values()) {
+    const first = group[0];
+    const deleter = await identifyDeleter(first.message, first.record, 700, group.length);
+    for (const item of group) {
+      await handleDeletedMessage(item.message, store, { waitMs: 0, bulkCount: group.length, deleter });
+    }
   }
 }
