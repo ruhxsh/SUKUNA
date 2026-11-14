@@ -295,3 +295,27 @@ test("configured co-owner or staff roles bypass blocked phrases", async () => {
   await handleAutomodMessage(message, { getConfig: () => config });
   assert.equal(message.wasDeleted(), false);
 });
+
+test("blocked language is always deleted and reported to the configured AutoMod channel", async () => {
+  resetSecurityMemoryForTests();
+  const config = makeStore({
+    automodLogChannelId: "72345678901234567",
+    automod: { ...makeStore().getConfig(guildId).automod, action: "alert", blockedPhrases: ["badword"] }
+  }).getConfig(guildId);
+  const sent = [];
+  const message = makeMessage({ content: "this contains badword", channelId: "32345678901234567" });
+  message.guild.channels = {
+    fetch: async id => ({
+      id,
+      isTextBased: () => true,
+      send: async payload => { sent.push(payload); }
+    })
+  };
+  await handleAutomodMessage(message, { getConfig: () => config });
+  assert.equal(message.wasDeleted(), true);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].content, /Member: .*22345678901234567/);
+  assert.match(sent[0].content, /Original channel: <#32345678901234567>/);
+  assert.match(sent[0].content, /Message deleted/);
+  assert.doesNotMatch(sent[0].content, /badword/i);
+});
