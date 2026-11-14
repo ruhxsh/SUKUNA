@@ -2,7 +2,7 @@ import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { PREFIX, getDataFilePath } from "./src/config.js";
 import { JsonStore } from "./src/store.js";
 import { handleModerationCommand } from "./src/commands/moderation.js";
-import { cacheMessage, handleDeletedMessage } from "./src/deleted-messages.js";
+import { cacheMessage, handleDeletedMessage, handleBulkDeletedMessages } from "./src/deleted-messages.js";
 import { handleAutomodMessage, handleRaidJoin, handleAuditLogEntry } from "./src/security.js";
 
 const token = process.env.DISCORD_TOKEN;
@@ -31,7 +31,7 @@ client.once("ready", readyClient => {
 client.on("messageCreate", async message => {
   if (!message.guild || message.author.bot) return;
   try {
-    cacheMessage(message);
+    cacheMessage(message, store);
     if (await handleAutomodMessage(message, store)) return;
     const content = message.content.trim();
     if (content.slice(0, PREFIX.length).toLowerCase() !== PREFIX) return;
@@ -48,13 +48,18 @@ client.on("messageCreate", async message => {
 });
 
 client.on("messageUpdate", async (_oldMessage, newMessage) => {
-  try { cacheMessage(newMessage); }
+  try { cacheMessage(newMessage, store); }
   catch (error) { console.error("Could not refresh deleted-message cache:", error); }
 });
 
 client.on("messageDelete", async message => {
   try { await handleDeletedMessage(message, store); }
   catch (error) { console.error("Deleted-message logging failed:", error); }
+});
+
+client.on("messageDeleteBulk", async messages => {
+  try { await handleBulkDeletedMessages(messages, store); }
+  catch (error) { console.error("Bulk deleted-message logging failed:", error); }
 });
 
 client.on("guildMemberAdd", async member => {
