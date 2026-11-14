@@ -300,6 +300,9 @@ export async function handleModerationCommand(message, args, store) {
       const logId = store.getConfig(guild.id).modLogChannelId;
       const logChannel = logId ? await guild.channels.fetch(logId).catch(() => null) : null;
       const logReady = Boolean(logChannel?.isTextBased() && logChannel.permissionsFor(botMember)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]));
+      const deletedLogId = store.getConfig(guild.id).deletedMessageLogChannelId;
+      const deletedLogChannel = deletedLogId ? await guild.channels.fetch(deletedLogId).catch(() => null) : null;
+      const deletedLogReady = Boolean(deletedLogChannel?.isTextBased() && deletedLogChannel.permissionsFor(botMember)?.has([PermissionFlagsBits.ViewChannel, PermissionFlagsBits.SendMessages, PermissionFlagsBits.EmbedLinks]));
       const missing = [];
       if (!botMember?.permissions?.has(PermissionFlagsBits.ViewAuditLog)) missing.push("View Audit Log");
       if (!botMember?.permissions?.has(PermissionFlagsBits.ManageMessages)) missing.push("Manage Messages");
@@ -322,7 +325,9 @@ export async function handleModerationCommand(message, args, store) {
         "Suspicious accounts: " + (current.suspiciousAccountDetectionEnabled ? "ON" : "OFF") +
         " | signals: below age threshold + default avatar | alert only\n" +
         "Audit-log anomaly checks: " + (botMember?.permissions?.has(PermissionFlagsBits.ViewAuditLog) ? "READY" : "UNAVAILABLE (View Audit Log permission missing)") + " | checks kick/ban executor permissions\n" +
-        "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") +
+        "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") + "\\n" +
+        "Deleted-message logs: " + (deletedLogId ? (deletedLogReady ? "READY in <#" + deletedLogId + ">" : "CONFIGURED BUT NOT READY (<#" + deletedLogId + ">)") : "DISABLED") +
+        " | content cache: in-memory only, 15 minutes / 5,000 recent messages" +
         " | missing bot permissions: " + (missing.length ? missing.join(", ") : "none detected") +
         "\nIgnored channels: " + summarizeIds(auto.ignoredChannelIds) + " | ignored roles: " + summarizeIds(auto.ignoredRoleIds);
       return void await message.reply(report);
