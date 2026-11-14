@@ -12,7 +12,7 @@ function normalizeConfig(input) {
   const automod = isObject(config.automod) ? config.automod : {};
   const security = isObject(config.security) ? config.security : {};
   const cleanPhrases = value => Array.isArray(value)
-    ? [...new Set(value.filter(v => typeof v === "string").map(v => v.trim().slice(0, 100)).filter(Boolean))].slice(0, 100)
+    ? [...new Set(value.filter(v => typeof v === "string").map(v => v.trim().slice(0, 100)).filter(Boolean))]
     : [];
   const phrases = cleanPhrases(automod.blockedPhrases);
   const whitelistPhrases = cleanPhrases(automod.whitelistPhrases);
