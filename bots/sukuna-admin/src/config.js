@@ -5,6 +5,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 export const PREFIX = "s";
 export const DEFAULT_CONFIG = Object.freeze({
   modLogChannelId: null,
+  deletedMessageLogChannelId: null,
   automod: {
     enabled: false,
     action: "delete",
