@@ -383,7 +383,8 @@ export async function handleModerationCommand(message, args, store) {
         " | signals: below age threshold + default avatar | alert only\n" +
         "Audit-log anomaly checks: " + (botMember?.permissions?.has(PermissionFlagsBits.ViewAuditLog) ? "READY" : "UNAVAILABLE (View Audit Log permission missing)") + " | checks kick/ban executor permissions\n" +
         "Mod logs: " + (logId ? (logReady ? "READY in <#" + logId + ">" : "CONFIGURED BUT NOT READY (<#" + logId + ">)") : "DISABLED") + "\n" +
-        "AutoMod notification channel: " + (store.getConfig(guild.id).automodLogChannelId ? "<#" + store.getConfig(guild.id).automodLogChannelId + ">" : "NOT CONFIGURED") + "\\n" +\n        "Deleted-message logs: " + (deletedLogId ? (deletedLogReady ? "READY in <#" + deletedLogId + ">" : "CONFIGURED BUT NOT READY (<#" + deletedLogId + ">)") : "DISABLED") +
+        "AutoMod notification channel: " + (store.getConfig(guild.id).automodLogChannelId ? "<#" + store.getConfig(guild.id).automodLogChannelId + ">" : "NOT CONFIGURED") + "\n" +
+        "Deleted-message logs: " + (deletedLogId ? (deletedLogReady ? "READY in <#" + deletedLogId + ">" : "CONFIGURED BUT NOT READY (<#" + deletedLogId + ">)") : "DISABLED") +
         " | content cache: in-memory only, 15 minutes / 5,000 recent messages" +
         " | missing bot permissions: " + (missing.length ? missing.join(", ") : "none detected") +
         "\nIgnored channels: " + summarizeIds(auto.ignoredChannelIds) + " | ignored roles: " + summarizeIds(auto.ignoredRoleIds);
