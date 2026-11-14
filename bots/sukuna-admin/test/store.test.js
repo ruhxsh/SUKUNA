@@ -201,3 +201,21 @@ test("removing an active warning archives it without deleting its reason", async
     assert.equal(history[0].reason, "Keep this reason");
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
+
+
+test("blocked phrase configuration supports more than 100 entries across restarts", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  const file = path.join(directory, "store.json");
+  try {
+    const store = await new JsonStore(file).init();
+    const phrases = Array.from({ length: 250 }, (_, index) => "blocked-phrase-" + index);
+    const config = await store.updateConfig(ids.guildId, current => ({
+      ...current,
+      automod: { ...current.automod, blockedPhrases: phrases }
+    }));
+    assert.equal(config.automod.blockedPhrases.length, 250);
+    const reloaded = await new JsonStore(file).init();
+    assert.equal(reloaded.getConfig(ids.guildId).automod.blockedPhrases.length, 250);
+    assert.equal(reloaded.getConfig(ids.guildId).automod.blockedPhrases[249], "blocked-phrase-249");
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
