@@ -77,7 +77,7 @@ export async function handleModerationCommand(message, args, store) {
       "s banlist\ns setmodlog #channel\ns disablemodlog\ns modlog status\n" +
       "s setdeletelog #channel\ns disabledeletelog\ns deletelog status\n" +
       "s automod on|off|status\ns automod links|caps|mentions on|off\ns automod whitelist add|remove phrase\n" +
-      "s automod block add|remove \"phrase\"\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\n" +
+      "s automod block add|remove \"phrase\"\ns automod staffrole add|remove @role\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\n" +
       "s raid on|off|status\ns raid threshold 10 30s\ns raid action set alert\ns raid whitelist add|remove @member\n" +
       "s security status\ns security suspicious on|off\ns security account-age on|off\ns security account-age-days 7");
     return;
@@ -169,7 +169,8 @@ export async function handleModerationCommand(message, args, store) {
       " | mentions: " + (current.blockMentions ? "ON (limit " + current.massMentionLimit + ")" : "OFF") +
       " | links: " + (current.blockLinks ? "BLOCKED" : "allowed") + " | invites: " + (current.blockInvites ? "blocked" : "allowed") +
       " | caps: " + (current.blockCaps ? "ON" : "OFF") + " | blocked phrases: " + current.blockedPhrases.length +
-      " | whitelist: " + current.whitelistPhrases.length + " | ignored channels: " + current.ignoredChannelIds.length +
+      " | whitelist: " + current.whitelistPhrases.length + " | staff roles: " + (current.staffRoleIds || []).length +
+      " | staff role IDs: " + summarizeIds(current.staffRoleIds || []) + " | ignored channels: " + current.ignoredChannelIds.length +
       " | ignored roles: " + current.ignoredRoleIds.length +
       " | ignored channel IDs: " + summarizeIds(current.ignoredChannelIds) +
       " | ignored role IDs: " + summarizeIds(current.ignoredRoleIds)
@@ -216,6 +217,33 @@ export async function handleModerationCommand(message, args, store) {
       await logConfigChange(message, store, "AutoMod blocked phrase " + rest[0] + ": " + phrase);
       return void await message.reply("Blocked phrase list updated.");
     }
+    if (sub === "staffrole" && ["add", "remove"].includes(rest[0])) {
+      const role = message.mentions.roles.first();
+      if (!role || role.guild.id !== guild.id) {
+        return void await message.reply("Mention a role from this server. Usage: s automod staffrole add|remove @role.");
+      }
+      const existing = current.staffRoleIds || [];
+      if (rest[0] === "add" && existing.includes(role.id)) {
+        return void await message.reply("That role is already exempt from blocked-phrase filtering.");
+      }
+      if (rest[0] === "remove" && !existing.includes(role.id)) {
+        return void await message.reply("That role is not in the AutoMod staff exemption list.");
+      }
+      if (rest[0] === "add" && existing.length >= 100) {
+        return void await message.reply("The AutoMod staff-role list is full (100 roles).");
+      }
+      await store.updateConfig(guild.id, c => {
+        const staffRoleIds = c.automod.staffRoleIds || [];
+        const next = rest[0] === "add"
+          ? [...new Set([...staffRoleIds, role.id])].slice(0, 100)
+          : staffRoleIds.filter(id => id !== role.id);
+        return { ...c, automod: { ...c.automod, staffRoleIds: next } };
+      });
+      await logConfigChange(message, store, "AutoMod staff-role exemption " + rest[0] + ": " + role.id);
+      return void await message.reply(rest[0] === "add"
+        ? role.name + " can now use blocked words without phrase-filter deletion."
+        : role.name + " is no longer exempt from blocked-phrase filtering.");
+    }
     if (sub === "action" && ["alert", "delete"].includes(rest[0])) {
       await store.updateConfig(guild.id, c => ({ ...c, automod: { ...c.automod, action: rest[0] } }));
       await logConfigChange(message, store, "AutoMod action set to " + rest[0] + ".");
@@ -243,7 +271,7 @@ export async function handleModerationCommand(message, args, store) {
       await logConfigChange(message, store, "AutoMod thresholds updated: rate " + rate + "/" + interval + "ms, duplicates " + duplicates + ", mentions " + mentions + ".");
       return void await message.reply("Automod thresholds updated.");
     }
-    return void await message.reply("Use s automod on|off|status, s automod links|caps|mentions on|off, s automod whitelist add|remove phrase, s automod action alert|delete, s automod invites on|off, s automod block add|remove phrase, s automod ignore channel|role add|remove, or s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT.");
+    return void await message.reply("Use s automod on|off|status, s automod links|caps|mentions on|off, s automod whitelist add|remove phrase, s automod staffrole add|remove @role, s automod action alert|delete, s automod invites on|off, s automod block add|remove phrase, s automod ignore channel|role add|remove, or s automod limits MAX_MESSAGES INTERVAL_MS DUPLICATE_LIMIT MENTION_LIMIT.");
   }
 
   if (command === "raid") {
