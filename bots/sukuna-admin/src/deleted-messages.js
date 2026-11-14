@@ -68,7 +68,7 @@ async function identifyDeleter(message, record, waitMs = 700, expectedCount = 1)
       entry.extra?.channel?.id === channelId &&
       entry.extra?.count === expectedCount &&
       now - entry.createdTimestamp >= 0 &&
-      now - entry.createdTimestamp <= 10000 &&
+      now - entry.createdTimestamp <= 5000 &&
       entry.executorId
     );
     if (matches.length !== 1) {
