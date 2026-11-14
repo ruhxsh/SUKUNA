@@ -19,6 +19,7 @@ function normalizeConfig(input) {
   const ids = value => Array.isArray(value) ? [...new Set(value.filter(snowflake))].slice(0, 100) : [];
   return {
     modLogChannelId: snowflake(config.modLogChannelId) ? config.modLogChannelId : null,
+    deletedMessageLogChannelId: snowflake(config.deletedMessageLogChannelId) ? config.deletedMessageLogChannelId : null,
     automod: {
       enabled: automod.enabled === true,
       action: ["alert", "delete"].includes(automod.action) ? automod.action : DEFAULT_CONFIG.automod.action,
