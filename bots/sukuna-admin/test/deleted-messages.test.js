@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   cacheMessage,
   handleDeletedMessage,
+  handleBulkDeletedMessages,
   resetDeletedMessageCacheForTests
 } from "../src/deleted-messages.js";
 
@@ -63,7 +64,7 @@ test("deleted message log preserves cached content and identifies a unique moder
   };
   const env = makeEnvironment({ auditEntries: [auditEntry] });
   const original = makeMessage(env.guild);
-  cacheMessage(original);
+  cacheMessage(original, env.store);
   const deleted = makeMessage(env.guild, { partial: true });
   await handleDeletedMessage(deleted, env.store, { waitMs: 0 });
   assert.equal(env.sent.length, 1);
@@ -86,7 +87,7 @@ test("ambiguous audit entries are not guessed", async () => {
   };
   const env = makeEnvironment({ auditEntries: [entry, { ...entry, executorId: ids.author }] });
   const original = makeMessage(env.guild);
-  cacheMessage(original);
+  cacheMessage(original, env.store);
   await handleDeletedMessage(makeMessage(env.guild, { partial: true }), env.store, { waitMs: 0 });
   const deleter = env.sent[0].embeds[0].data.fields.find(field => field.name === "Deleted by").value;
   assert.match(deleter, /unambiguous/);
@@ -98,6 +99,26 @@ test("uncached partial messages are clearly marked instead of inventing content"
   await handleDeletedMessage(makeMessage(env.guild, { partial: true }), env.store, { waitMs: 0 });
   const content = env.sent[0].embeds[0].data.fields.find(field => field.name === "Original message").value;
   assert.match(content, /not cached by SUKUNA/);
+});
+
+test("bulk deletion uses the matching bulk audit count for actor attribution", async () => {
+  resetDeletedMessageCacheForTests();
+  const entry = {
+    targetId: ids.author,
+    executorId: ids.moderator,
+    createdTimestamp: Date.now(),
+    extra: { channel: { id: ids.channel }, count: 2 }
+  };
+  const env = makeEnvironment({ auditEntries: [entry] });
+  const first = makeMessage(env.guild);
+  const second = { ...makeMessage(env.guild), id: "72345678901234567", content: "Second removed message" };
+  cacheMessage(first, env.store);
+  cacheMessage(second, env.store);
+  await handleBulkDeletedMessages(new Map([[first.id, makeMessage(env.guild, { partial: true })], [second.id, { ...makeMessage(env.guild, { partial: true }), id: second.id }]]), env.store);
+  assert.equal(env.sent.length, 2);
+  for (const payload of env.sent) {
+    assert.match(payload.embeds[0].data.fields.find(field => field.name === "Deleted by").value, /Moderator/);
+  }
 });
 
 test("deleted-message logging does nothing when no destination is configured", async () => {
