@@ -40,10 +40,10 @@ export function resetDeletedMessageCacheForTests() {
   recentMessages.clear();
 }
 
-async function identifyDeleter(message, waitMs = 700) {
-  const guild = message.guild;
-  const authorId = message.author?.id;
-  const channelId = message.channelId || message.channel?.id;
+async function identifyDeleter(message, record, waitMs = 700) {
+  const guild = message.guild || message.client?.guilds?.cache?.get(message.guildId);
+  const authorId = record?.authorId || message.author?.id;
+  const channelId = message.channelId || message.channel?.id || record?.channelId;
   if (!guild || !authorId || !channelId) return "Unknown (Discord did not provide deletion details)";
   if (!guild.members.me?.permissions?.has(PermissionFlagsBits.ViewAuditLog)) {
     return "Unknown (the bot is missing View Audit Log permission)";
@@ -84,8 +84,8 @@ function attachmentSummary(attachments) {
 }
 
 export async function handleDeletedMessage(message, store, options = {}) {
-  const guild = message?.guild;
-  const guildId = message?.guildId || guild?.id;
+  const guildId = message?.guildId || message?.guild?.id;
+  const guild = message?.guild || message?.client?.guilds?.cache?.get(guildId);
   const channelId = message?.channelId || message?.channel?.id;
   const messageId = message?.id;
   if (!guild || !guildId || !channelId || !messageId || message.author?.bot) return;
@@ -112,7 +112,7 @@ export async function handleDeletedMessage(message, store, options = {}) {
     return;
   }
 
-  const deleter = await identifyDeleter(message, options.waitMs ?? 700);
+  const deleter = await identifyDeleter(message, record, options.waitMs ?? 700);
   const author = record
     ? record.authorName + (record.authorId ? " (<@" + record.authorId + ">)" : "")
     : message.author?.username || "Unknown author";
