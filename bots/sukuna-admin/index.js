@@ -1,7 +1,8 @@
-import { Client, GatewayIntentBits } from "discord.js";
+import { Client, GatewayIntentBits, Partials } from "discord.js";
 import { PREFIX, getDataFilePath } from "./src/config.js";
 import { JsonStore } from "./src/store.js";
 import { handleModerationCommand } from "./src/commands/moderation.js";
+import { cacheMessage, handleDeletedMessage } from "./src/deleted-messages.js";
 import { handleAutomodMessage, handleRaidJoin, handleAuditLogEntry } from "./src/security.js";
 
 const token = process.env.DISCORD_TOKEN;
@@ -11,6 +12,7 @@ if (!token) {
 }
 
 const client = new Client({
+  partials: [Partials.Message, Partials.Channel],
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
@@ -29,6 +31,7 @@ client.once("ready", readyClient => {
 client.on("messageCreate", async message => {
   if (!message.guild || message.author.bot) return;
   try {
+    cacheMessage(message);
     if (await handleAutomodMessage(message, store)) return;
     const content = message.content.trim();
     if (content.slice(0, PREFIX.length).toLowerCase() !== PREFIX) return;
@@ -42,6 +45,16 @@ client.on("messageCreate", async message => {
     console.error("Message processing failed:", error);
     if (message.channel?.send) await message.reply("An unexpected error occurred while processing that message.").catch(() => {});
   }
+});
+
+client.on("messageUpdate", async (_oldMessage, newMessage) => {
+  try { cacheMessage(newMessage); }
+  catch (error) { console.error("Could not refresh deleted-message cache:", error); }
+});
+
+client.on("messageDelete", async message => {
+  try { await handleDeletedMessage(message, store); }
+  catch (error) { console.error("Deleted-message logging failed:", error); }
 });
 
 client.on("guildMemberAdd", async member => {
