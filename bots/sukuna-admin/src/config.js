@@ -6,6 +6,7 @@ export const PREFIX = "s";
 export const DEFAULT_CONFIG = Object.freeze({
   modLogChannelId: null,
   deletedMessageLogChannelId: null,
+  automodLogChannelId: null,
   automod: {
     enabled: false,
     action: "delete",
