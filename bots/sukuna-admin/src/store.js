@@ -16,7 +16,7 @@ function normalizeConfig(input) {
     : [];
   const phrases = cleanPhrases(automod.blockedPhrases);
   const whitelistPhrases = cleanPhrases(automod.whitelistPhrases);
-  const ids = value => Array.isArray(value) ? [...new Set(value.filter(snowflake))].slice(0, 100) : [];
+  const ids = value => Array.isArray(value) ? [...new Set(value.filter(snowflake))] : [];
   return {
     modLogChannelId: snowflake(config.modLogChannelId) ? config.modLogChannelId : null,
     deletedMessageLogChannelId: snowflake(config.deletedMessageLogChannelId) ? config.deletedMessageLogChannelId : null,
