@@ -77,7 +77,7 @@ export async function handleModerationCommand(message, args, store) {
       "s banlist\ns setmodlog #channel\ns disablemodlog\ns modlog status\n" +
       "s setdeletelog #channel\ns disabledeletelog\ns deletelog status\n" +
       "s automod on|off|status\ns automod links|caps|mentions on|off\ns automod whitelist add|remove phrase\n" +
-      "s automod block add|remove \"phrase\"\ns automod blocked [page]\\n      "s automod staffrole add|remove @role\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\n" +
+      "s automod block add|remove \"phrase\"\\ns automod blocked [page]\\ns automod staffrole add|remove @role\\ns automod invites on|off\\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\\ns automod ignore channel|role add|remove\\n" +
       "s raid on|off|status\ns raid threshold 10 30s\ns raid action set alert\ns raid whitelist add|remove @member\n" +
       "s security status\ns security suspicious on|off\ns security account-age on|off\ns security account-age-days 7");
     return;
@@ -207,11 +207,10 @@ export async function handleModerationCommand(message, args, store) {
       }
       const start = (page - 1) * pageSize;
       const lines = phrases.slice(start, start + pageSize).map((phrase, index) =>
-        "**" + (start + index + 1) + ".** " + String(phrase).replace(/[\\\\`*_~|>]/g, "\\\\    const current = store.getConfig(guild.id).automod;
-    if (sub === "status")").replace(/@/g, "@\\u200b")
+        "**" + (start + index + 1) + ".** " + String(phrase).replace(/[\\*_~|>]/g, "\\$&").replace(/`/g, "\\`").replace(/@/g, "@\u200b")
       );
       const embed = new EmbedBuilder().setTitle("AutoMod — Blocked Words and Phrases")
-        .setDescription(lines.join("\\n"))
+        .setDescription(lines.join("\n"))
         .setFooter({ text: "Page " + page + "/" + pages + " • " + phrases.length + " total entries" });
       return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
@@ -488,11 +487,11 @@ export async function handleModerationCommand(message, args, store) {
       const start = (page - 1) * pageSize;
       const pageRecords = records.slice(start, start + pageSize);
       const recordLines = await Promise.all(pageRecords.map(async w =>
-        "**Warning #" + w.number + " — " + (w.status === "active" ? "ACTIVE" : String(w.status).toUpperCase()) + "\\nReason: " + String(w.reason || "No reason recorded").slice(0, 220) + "\\nModerator: " + await getUserMention(guild, w.moderatorId) + "\\nDate: " + w.createdAt
+        "**Warning #" + w.number + " — " + (w.status === "active" ? "ACTIVE" : String(w.status).toUpperCase()) + "\nReason: " + String(w.reason || "No reason recorded").slice(0, 220) + "\nModerator: " + await getUserMention(guild, w.moderatorId) + "\nDate: " + w.createdAt
       ));
       const embed = new EmbedBuilder()
         .setTitle((command === "warnings" ? "Active warnings for " : "Warning history for ") + targetLabel)
-        .setDescription(recordLines.join("\\n\\n").slice(0, 4000))
+        .setDescription(recordLines.join("\n\n").slice(0, 4000))
         .setFooter({ text: "Page " + page + "/" + pages + " • " + records.length + " records" });
       return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
