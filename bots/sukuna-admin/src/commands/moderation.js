@@ -73,8 +73,8 @@ export async function handleModerationCommand(message, args, store) {
     await message.reply("**SUKUNA — Administration & Security**\n" +
       "s kick @member [reason]\ns ban @member [reason]\ns unban USER_ID [reason]\n" +
       "s timeout @member 10m [reason]\ns untimeout @member [reason]\ns warn @member [reason]\n" +
-      "s warnings @member\ns warninghistory @member\ns modhistory @member\ns removewarn @member WARNING_NUMBER\ns clearwarnings @member\n" +
-      "s banlist\ns setmodlog #channel\ns disablemodlog\ns modlog status\n" +
+      "s warnings @member [page]\ns warninghistory @member [page]\ns modhistory @member [page]\ns removewarn @member WARNING_NUMBER\ns clearwarnings @member\n" +
+      "s banlist [page]\ns setmodlog #channel\ns disablemodlog\ns modlog status\n" +
       "s setdeletelog #channel\ns disabledeletelog\ns deletelog status\n" +
       "s automod on|off|status\ns automod links|caps|mentions on|off\ns automod whitelist add|remove phrase\n" +
       "s automod block add|remove \"phrase\"\ns automod blocked [page]\ns automod staffrole add|remove @role\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\n" +
@@ -180,7 +180,7 @@ export async function handleModerationCommand(message, args, store) {
         after = lastId;
       }
       if (!entries.length) return void await message.reply("There are no banned users in this server.");
-      const pageSize = 20;
+      const pageSize = 10;
       const pages = Math.ceil(entries.length / pageSize);
       const page = args[0] === undefined ? 1 : Number(args[0]);
       if (!Number.isInteger(page) || page < 1 || page > pages) return void await message.reply("Choose a ban-list page from 1 to " + pages + ". Usage: s banlist [page].");
