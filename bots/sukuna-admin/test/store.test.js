@@ -125,7 +125,7 @@ test("configuration ID lists have no 100-entry cap and persist across restarts",
   const file = path.join(directory, "store.json");
   try {
     const store = await new JsonStore(file).init();
-    const idList = Array.from({ length: 175 }, (_, index) => String(40000000000000000 + index));
+    const idList = Array.from({ length: 175 }, (_, index) => "40000000000000000" + String(index).padStart(3, "0"));
     const config = await store.updateConfig(ids.guildId, current => ({
       ...current,
       automod: { ...current.automod, staffRoleIds: idList, ignoredChannelIds: idList, ignoredRoleIds: idList },
