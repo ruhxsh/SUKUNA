@@ -234,11 +234,13 @@ test("blocked phrase configuration supports more than 100 entries across restart
     const phrases = Array.from({ length: 250 }, (_, index) => "blocked-phrase-" + index);
     const config = await store.updateConfig(ids.guildId, current => ({
       ...current,
-      automod: { ...current.automod, blockedPhrases: phrases }
+      automod: { ...current.automod, blockedPhrases: phrases, whitelistPhrases: phrases }
     }));
     assert.equal(config.automod.blockedPhrases.length, 250);
+    assert.equal(config.automod.whitelistPhrases.length, 250);
     const reloaded = await new JsonStore(file).init();
     assert.equal(reloaded.getConfig(ids.guildId).automod.blockedPhrases.length, 250);
+    assert.equal(reloaded.getConfig(ids.guildId).automod.whitelistPhrases.length, 250);
     assert.equal(reloaded.getConfig(ids.guildId).automod.blockedPhrases[249], "blocked-phrase-249");
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
