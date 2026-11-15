@@ -120,6 +120,29 @@ test("deleted-message log destination persists and validates Discord channel IDs
   } finally { await fs.rm(directory, { recursive: true, force: true }); }
 });
 
+test("configuration ID lists have no 100-entry cap and persist across restarts", async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
+  const file = path.join(directory, "store.json");
+  try {
+    const store = await new JsonStore(file).init();
+    const ids = Array.from({ length: 175 }, (_, index) => String(40000000000000000 + index));
+    const config = await store.updateConfig(ids.guildId, current => ({
+      ...current,
+      automod: { ...current.automod, staffRoleIds: ids, ignoredChannelIds: ids, ignoredRoleIds: ids },
+      security: { ...current.security, raidWhitelistIds: ids }
+    }));
+    assert.equal(config.automod.staffRoleIds.length, 175);
+    assert.equal(config.automod.ignoredChannelIds.length, 175);
+    assert.equal(config.automod.ignoredRoleIds.length, 175);
+    assert.equal(config.security.raidWhitelistIds.length, 175);
+    const reloaded = await new JsonStore(file).init();
+    assert.equal(reloaded.getConfig(ids.guildId).automod.staffRoleIds.length, 175);
+    assert.equal(reloaded.getConfig(ids.guildId).automod.ignoredChannelIds.length, 175);
+    assert.equal(reloaded.getConfig(ids.guildId).automod.ignoredRoleIds.length, 175);
+    assert.equal(reloaded.getConfig(ids.guildId).security.raidWhitelistIds.length, 175);
+  } finally { await fs.rm(directory, { recursive: true, force: true }); }
+});
+
 test("invalid database is backed up instead of silently overwritten", async () => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "sukuna-admin-"));
   const file = path.join(directory, "store.json");
