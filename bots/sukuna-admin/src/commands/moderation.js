@@ -77,7 +77,7 @@ export async function handleModerationCommand(message, args, store) {
       "s banlist\ns setmodlog #channel\ns disablemodlog\ns modlog status\n" +
       "s setdeletelog #channel\ns disabledeletelog\ns deletelog status\n" +
       "s automod on|off|status\ns automod links|caps|mentions on|off\ns automod whitelist add|remove phrase\n" +
-      "s automod block add|remove \"phrase\"\ns automod staffrole add|remove @role\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\n" +
+      "s automod block add|remove \"phrase\"\ns automod blocked [page]\\n      "s automod staffrole add|remove @role\ns automod invites on|off\ns automod limits MAX INTERVAL DUPLICATES MENTIONS\ns automod ignore channel|role add|remove\n" +
       "s raid on|off|status\ns raid threshold 10 30s\ns raid action set alert\ns raid whitelist add|remove @member\n" +
       "s security status\ns security suspicious on|off\ns security account-age on|off\ns security account-age-days 7");
     return;
@@ -169,9 +169,17 @@ export async function handleModerationCommand(message, args, store) {
 
   if (command === "banlist") {
     try {
-      const bans = await guild.bans.fetch({ limit: 1000 });
-      if (!bans.size) return void await message.reply("There are no banned users in this server.");
-      const entries = [...bans.values()];
+      const entries = [];
+      let after;
+      while (true) {
+        const batch = await guild.bans.fetch({ limit: 1000, ...(after ? { after } : {}) });
+        if (!batch.size) break;
+        entries.push(...batch.values());
+        const lastId = batch.last()?.user?.id;
+        if (batch.size < 1000 || !lastId || lastId === after) break;
+        after = lastId;
+      }
+      if (!entries.length) return void await message.reply("There are no banned users in this server.");
       const pageSize = 20;
       const pages = Math.ceil(entries.length / pageSize);
       const page = args[0] === undefined ? 1 : Number(args[0]);
@@ -188,6 +196,25 @@ export async function handleModerationCommand(message, args, store) {
   if (command === "automod") {
     const [sub, ...rest] = args;
     const current = store.getConfig(guild.id).automod;
+    if (sub === "blocked") {
+      const phrases = current.blockedPhrases || [];
+      if (!phrases.length) return void await message.reply("There are no blocked words or phrases configured.");
+      const pageSize = 15;
+      const pages = Math.ceil(phrases.length / pageSize);
+      const page = rest[0] === undefined ? 1 : Number(rest[0]);
+      if (!Number.isSafeInteger(page) || page < 1 || page > pages) {
+        return void await message.reply("Choose a blocked-phrase page from 1 to " + pages + ". Usage: s automod blocked [page].");
+      }
+      const start = (page - 1) * pageSize;
+      const lines = phrases.slice(start, start + pageSize).map((phrase, index) =>
+        "**" + (start + index + 1) + ".** " + String(phrase).replace(/[\\\\`*_~|>]/g, "\\\\    const current = store.getConfig(guild.id).automod;
+    if (sub === "status")").replace(/@/g, "@\\u200b")
+      );
+      const embed = new EmbedBuilder().setTitle("AutoMod — Blocked Words and Phrases")
+        .setDescription(lines.join("\\n"))
+        .setFooter({ text: "Page " + page + "/" + pages + " • " + phrases.length + " total entries" });
+      return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
+    }
     if (sub === "status") return void await message.reply(
       "Automod: " + (current.enabled ? "ON" : "OFF") + " | action: " + current.action +
       " | rate: " + current.maxMessages + "/" + current.intervalMs + "ms | duplicates: " + current.duplicateLimit +
@@ -214,11 +241,10 @@ export async function handleModerationCommand(message, args, store) {
     if (sub === "whitelist" && ["add", "remove"].includes(rest[0])) {
       const phrase = rest.slice(1).join(" ").trim().slice(0, 100);
       if (phrase.length < 2) return void await message.reply('Provide a word or phrase of at least 2 characters. Example: s automod whitelist add "approved phrase".');
-      if (rest[0] === "add" && !current.whitelistPhrases.some(item => item.toLowerCase() === phrase.toLowerCase()) && current.whitelistPhrases.length >= 100) return void await message.reply("The AutoMod whitelist is full (100 entries).");
       await store.updateConfig(guild.id, c => {
         const list = c.automod.whitelistPhrases;
         const exists = list.some(item => item.toLowerCase() === phrase.toLowerCase());
-        const next = rest[0] === "add" ? (exists ? list : [...list, phrase].slice(0, 100)) : list.filter(item => item.toLowerCase() !== phrase.toLowerCase());
+        const next = rest[0] === "add" ? (exists ? list : [...list, phrase]) : list.filter(item => item.toLowerCase() !== phrase.toLowerCase());
         return { ...c, automod: { ...c.automod, whitelistPhrases: next } };
       });
       await logConfigChange(message, store, "Automod whitelist " + rest[0] + ": " + phrase);
@@ -254,13 +280,10 @@ export async function handleModerationCommand(message, args, store) {
       if (rest[0] === "remove" && !existing.includes(role.id)) {
         return void await message.reply("That role is not in the AutoMod staff exemption list.");
       }
-      if (rest[0] === "add" && existing.length >= 100) {
-        return void await message.reply("The AutoMod staff-role list is full (100 roles).");
-      }
       await store.updateConfig(guild.id, c => {
         const staffRoleIds = c.automod.staffRoleIds || [];
         const next = rest[0] === "add"
-          ? [...new Set([...staffRoleIds, role.id])].slice(0, 100)
+          ? [...new Set([...staffRoleIds, role.id])]
           : staffRoleIds.filter(id => id !== role.id);
         return { ...c, automod: { ...c.automod, staffRoleIds: next } };
       });
@@ -338,7 +361,6 @@ export async function handleModerationCommand(message, args, store) {
         const trustedMember = await guild.members.fetch(id).catch(() => null);
         if (!trustedMember) return void await message.reply("Only current server members can be added to the raid whitelist.");
       }
-      if (value === "add" && !exists && current.raidWhitelistIds.length >= 100) return void await message.reply("The raid whitelist is full (100 members).");
       await store.updateConfig(guild.id, c => {
         const list = c.security.raidWhitelistIds;
         return { ...c, security: { ...c.security, raidWhitelistIds: value === "add" ? [...new Set([...list, id])] : list.filter(item => item !== id) } };
@@ -457,12 +479,21 @@ export async function handleModerationCommand(message, args, store) {
         : store.getWarningHistory(guild.id, targetId);
       if (!records.length) return void await message.reply(command === "warnings" ? "That member has no active warnings." : "That member has no warning history.");
       const targetLabel = await getUserMention(guild, targetId);
-      const recordLines = await Promise.all(records.slice(0, 12).map(async w =>
-        "**Warning #" + w.number + " — " + (w.status === "active" ? "ACTIVE" : w.status.toUpperCase()) + "**\nReason: " + w.reason + "\nModerator: " + await getUserMention(guild, w.moderatorId) + "\nDate: " + w.createdAt
+      const pageSize = 10;
+      const pages = Math.ceil(records.length / pageSize);
+      const page = args[1] === undefined ? 1 : Number(args[1]);
+      if (!Number.isSafeInteger(page) || page < 1 || page > pages) {
+        return void await message.reply("Choose a warning page from 1 to " + pages + ". Usage: s " + command + " @member [page].");
+      }
+      const start = (page - 1) * pageSize;
+      const pageRecords = records.slice(start, start + pageSize);
+      const recordLines = await Promise.all(pageRecords.map(async w =>
+        "**Warning #" + w.number + " — " + (w.status === "active" ? "ACTIVE" : String(w.status).toUpperCase()) + "\\nReason: " + String(w.reason || "No reason recorded").slice(0, 220) + "\\nModerator: " + await getUserMention(guild, w.moderatorId) + "\\nDate: " + w.createdAt
       ));
       const embed = new EmbedBuilder()
         .setTitle((command === "warnings" ? "Active warnings for " : "Warning history for ") + targetLabel)
-        .setDescription(recordLines.join("\n\n").slice(0, 4000));
+        .setDescription(recordLines.join("\\n\\n").slice(0, 4000))
+        .setFooter({ text: "Page " + page + "/" + pages + " • " + records.length + " records" });
       return void await message.reply({ embeds: [embed], allowedMentions: { parse: [] } });
     }
     if (command === "clearwarnings") {
